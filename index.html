@@ -1,0 +1,1842 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#050a14"/>
+<title>Capital Taiyo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+:root{
+  --bg: #050a14;
+  --bg2: #080f1e;
+  --glass: rgba(255,255,255,0.04);
+  --glass2: rgba(255,255,255,0.07);
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.13);
+  --cyan: #00d4ff;
+  --cyan2: #00a8cc;
+  --gold: #f5a623;
+  --gold2: #e09010;
+  --green: #00e5a0;
+  --red: #ff4d6d;
+  --purple: #b06aff;
+  --text: #f0f4ff;
+  --text2: #8899bb;
+  --text3: #445577;
+  --card-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  --glow-cyan: 0 0 20px rgba(0,212,255,0.3);
+  --glow-gold: 0 0 20px rgba(245,166,35,0.3);
+  --glow-green: 0 0 20px rgba(0,229,160,0.3);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{
+  background:var(--bg);
+  font-family:'Outfit',sans-serif;
+  color:var(--text);
+  overflow:hidden;
+}
+#root{height:100vh;overflow:hidden;}
+
+/* ── Animated background mesh ── */
+body::before{
+  content:"";
+  position:fixed;inset:0;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 10%, rgba(0,212,255,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(176,106,255,0.05) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 50% 50%, rgba(0,229,160,0.03) 0%, transparent 70%);
+  pointer-events:none;z-index:0;
+}
+body::after{
+  content:"";
+  position:fixed;inset:0;
+  background-image:
+    repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,0.015) 39px,rgba(255,255,255,0.015) 40px),
+    repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,0.015) 39px,rgba(255,255,255,0.015) 40px);
+  pointer-events:none;z-index:0;
+}
+
+/* ── Scrollable view wrapper ── */
+.view-wrap{
+  position:relative;z-index:1;
+  height:100vh;overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+}
+.view-wrap::-webkit-scrollbar{display:none;}
+
+/* ── Page transitions ── */
+@keyframes slideInRight{from{transform:translateX(100%);opacity:0}to{transform:none;opacity:1}}
+@keyframes slideInUp{from{transform:translateY(60px);opacity:0}to{transform:none;opacity:1}}
+@keyframes slideInLeft{from{transform:translateX(-40px);opacity:0}to{transform:none;opacity:1}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes scaleIn{from{opacity:0;transform:scale(0.92)}to{opacity:1;transform:none}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+@keyframes glow{0%,100%{box-shadow:0 0 8px rgba(0,212,255,0.2)}50%{box-shadow:0 0 24px rgba(0,212,255,0.6)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes bounce{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
+@keyframes countUp{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+@keyframes ripple{0%{transform:scale(0);opacity:0.6}100%{transform:scale(4);opacity:0}}
+@keyframes floatDot{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes pendingPulse{0%,100%{box-shadow:0 0 0 0 rgba(245,166,35,0.4)}70%{box-shadow:0 0 0 8px rgba(245,166,35,0)}}
+
+.page-slide{animation:slideInRight .28s cubic-bezier(.25,.46,.45,.94) both;}
+.page-up{animation:slideInUp .3s cubic-bezier(.25,.46,.45,.94) both;}
+.page-fade{animation:fadeIn .22s ease both;}
+.stagger-1{animation:fadeUp .3s ease both;animation-delay:.05s}
+.stagger-2{animation:fadeUp .3s ease both;animation-delay:.1s}
+.stagger-3{animation:fadeUp .3s ease both;animation-delay:.15s}
+.stagger-4{animation:fadeUp .3s ease both;animation-delay:.2s}
+
+/* ── Glass cards ── */
+.card{
+  background:var(--glass);
+  border:1px solid var(--border);
+  border-radius:16px;
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  transition:border-color .2s,box-shadow .2s;
+}
+.card:active{border-color:var(--border2);}
+.card-cyan{border-color:rgba(0,212,255,0.2);box-shadow:0 0 0 1px rgba(0,212,255,0.05) inset;}
+.card-gold{border-color:rgba(245,166,35,0.2);box-shadow:0 0 0 1px rgba(245,166,35,0.05) inset;}
+.card-green{border-color:rgba(0,229,160,0.2);box-shadow:0 0 0 1px rgba(0,229,160,0.05) inset;}
+.card-red{border-color:rgba(255,77,109,0.2);box-shadow:0 0 0 1px rgba(255,77,109,0.05) inset;}
+
+/* ── Buttons ── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  border:none;border-radius:12px;cursor:pointer;
+  font-family:'Outfit',sans-serif;font-weight:700;
+  transition:transform .15s,box-shadow .15s,background .15s;
+  position:relative;overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+}
+.btn:active{transform:scale(0.95);}
+.btn-primary{
+  background:linear-gradient(135deg,var(--cyan),var(--cyan2));
+  color:#050a14;
+  box-shadow:0 4px 20px rgba(0,212,255,0.3);
+}
+.btn-primary:active{box-shadow:0 2px 8px rgba(0,212,255,0.2);}
+.btn-success{
+  background:linear-gradient(135deg,var(--green),#00b87a);
+  color:#050a14;
+  box-shadow:0 4px 20px rgba(0,229,160,0.3);
+}
+.btn-ghost{background:var(--glass2);border:1px solid var(--border2);color:var(--text2);}
+.btn-danger{background:rgba(255,77,109,0.12);border:1px solid rgba(255,77,109,0.3);color:var(--red);}
+.btn-gold{background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.3);color:var(--gold);}
+.btn-purple{background:rgba(176,106,255,0.12);border:1px solid rgba(176,106,255,0.3);color:var(--purple);}
+
+/* ── Top bar ── */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;gap:10px;
+  padding:14px 16px;
+  background:rgba(5,10,20,0.85);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+}
+.topbar-title{
+  font-size:15px;font-weight:800;
+  background:linear-gradient(90deg,var(--text),var(--text2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
+/* ── Bottom nav ── */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;z-index:60;
+  display:flex;
+  background:rgba(5,10,20,0.92);
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+  border-top:1px solid var(--border);
+  padding-bottom:env(safe-area-inset-bottom,8px);
+}
+.nav-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:10px 4px 6px;cursor:pointer;position:relative;
+  transition:color .2s;
+  border:none;background:none;color:var(--text3);
+  font-family:'Outfit',sans-serif;font-size:10px;font-weight:700;
+  -webkit-tap-highlight-color:transparent;
+}
+.nav-item.active{color:var(--cyan);}
+.nav-item .nav-icon{font-size:20px;margin-bottom:3px;transition:transform .2s;}
+.nav-item.active .nav-icon{transform:scale(1.15);}
+.nav-dot{
+  position:absolute;top:8px;right:calc(50% - 14px);
+  width:7px;height:7px;border-radius:99px;
+  background:var(--red);border:1.5px solid var(--bg);
+  animation:pulse 1.5s ease-in-out infinite;
+}
+
+/* ── Money text ── */
+.money{
+  font-family:'DM Mono',monospace;font-weight:500;
+  animation:countUp .3s ease both;
+}
+.money-lg{font-size:28px;font-weight:500;}
+.money-gold{color:var(--gold);}
+.money-green{color:var(--green);}
+.money-red{color:var(--red);}
+
+/* ── Status badges ── */
+.badge{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:11px;font-weight:700;
+  padding:3px 9px;border-radius:99px;
+  white-space:nowrap;
+}
+.badge-dot{width:6px;height:6px;border-radius:99px;}
+.badge-pending{background:rgba(255,255,255,0.06);color:#8899bb;border:1px solid rgba(255,255,255,0.1);}
+.badge-collected{background:rgba(0,229,160,0.1);color:var(--green);border:1px solid rgba(0,229,160,0.25);}
+.badge-absent{background:rgba(255,77,109,0.1);color:var(--red);border:1px solid rgba(255,77,109,0.25);}
+.badge-partial{background:rgba(176,106,255,0.1);color:var(--purple);border:1px solid rgba(176,106,255,0.25);}
+
+/* ── Customer card ── */
+.cust-card{
+  background:var(--glass);
+  border-radius:14px;
+  border:1px solid var(--border);
+  margin-bottom:10px;
+  overflow:hidden;
+  transition:transform .15s,box-shadow .15s;
+  animation:fadeUp .25s ease both;
+}
+.cust-card:active{transform:scale(0.98);box-shadow:var(--card-shadow);}
+.cust-card-pending{border-left:3px solid var(--gold);animation:fadeUp .25s ease both,pendingPulse 2.5s ease-in-out infinite;}
+.cust-card-collected{border-left:3px solid var(--green);}
+.cust-card-absent{border-left:3px solid var(--red);}
+.cust-card-partial{border-left:3px solid var(--purple);}
+
+/* ── Section label ── */
+.section-label{
+  font-size:10px;font-weight:800;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--text3);
+  margin-bottom:10px;
+}
+
+/* ── Road divider ── */
+.road-divider{
+  display:flex;align-items:center;gap:10px;
+  margin:16px 0 10px;
+}
+.road-divider-line{flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);}
+.road-pill{
+  font-size:11px;font-weight:700;color:var(--cyan);
+  background:rgba(0,212,255,0.08);
+  border:1px solid rgba(0,212,255,0.2);
+  border-radius:99px;padding:4px 12px;white-space:nowrap;
+}
+
+/* ── Inputs ── */
+.inp{
+  width:100%;background:rgba(255,255,255,0.04);
+  border:1px solid var(--border2);border-radius:12px;
+  padding:12px 16px;color:var(--text);
+  font-family:'Outfit',sans-serif;font-size:15px;
+  outline:none;transition:border-color .2s,box-shadow .2s;
+}
+.inp:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(0,212,255,0.1);}
+.inp::placeholder{color:var(--text3);}
+textarea.inp{resize:none;}
+
+/* ── Sheet modal ── */
+.sheet-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.7);
+  backdrop-filter:blur(4px);z-index:200;
+  display:flex;align-items:flex-end;
+  animation:fadeIn .2s ease both;
+}
+.sheet{
+  background:linear-gradient(180deg,#0d1626 0%,#080f1e 100%);
+  width:100%;border-radius:20px 20px 0 0;
+  border-top:1px solid var(--border2);
+  max-height:92vh;overflow-y:auto;
+  padding-bottom:env(safe-area-inset-bottom,16px);
+  animation:slideInUp .28s cubic-bezier(.25,.46,.45,.94) both;
+}
+.sheet::-webkit-scrollbar{display:none;}
+.sheet-handle{width:40px;height:4px;border-radius:99px;background:var(--border2);margin:12px auto 0;}
+.sheet-inner-pad{padding-bottom:24px;}
+
+/* ── Pin pad ── */
+.pin-key{
+  height:64px;border-radius:16px;
+  background:var(--glass2);border:1px solid var(--border);
+  color:var(--text);font-size:22px;font-weight:700;
+  font-family:'Outfit',sans-serif;
+  cursor:pointer;transition:transform .1s,background .1s,box-shadow .1s;
+  -webkit-tap-highlight-color:transparent;
+}
+.pin-key:active{transform:scale(0.9);background:rgba(0,212,255,0.15);box-shadow:0 0 20px rgba(0,212,255,0.3);}
+.pin-dot{
+  width:16px;height:16px;border-radius:99px;
+  border:2px solid var(--border2);
+  transition:all .2s cubic-bezier(.34,1.56,.64,1);
+}
+.pin-dot.filled{background:var(--cyan);border-color:var(--cyan);transform:scale(1.2);box-shadow:0 0 12px rgba(0,212,255,0.6);}
+.pin-dot.error{background:var(--red);border-color:var(--red);}
+
+/* ── Progress bar ── */
+.progress-track{background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden;}
+.progress-fill{
+  height:100%;border-radius:99px;
+  transition:width .6s cubic-bezier(.25,.46,.45,.94);
+}
+
+/* ── Stat cards ── */
+.stat-card{
+  background:var(--glass);border:1px solid var(--border);
+  border-radius:14px;padding:14px;text-align:center;
+  transition:transform .2s;
+}
+.stat-card:active{transform:scale(0.97);}
+
+/* ── Tab bar ── */
+.tab-bar{display:flex;border-bottom:1px solid var(--border);}
+.tab-btn{
+  flex:1;padding:11px 0;border:none;background:none;
+  font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;
+  color:var(--text3);cursor:pointer;
+  border-bottom:2px solid transparent;transition:color .2s,border-color .2s;
+}
+.tab-btn.active{color:var(--cyan);border-bottom-color:var(--cyan);}
+
+/* ── Shimmer loader ── */
+.shimmer{
+  background:linear-gradient(90deg,var(--glass) 25%,rgba(255,255,255,0.08) 50%,var(--glass) 75%);
+  background-size:200% 100%;
+  animation:shimmer 1.5s infinite;
+  border-radius:8px;
+}
+
+/* ── Misc ── */
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
+input[type=date]{color-scheme:dark;}
+a{text-decoration:none;}
+.mono{font-family:'DM Mono',monospace;}
+.pb-nav{padding-bottom:80px;}
+.gradient-text{
+  background:linear-gradient(135deg,var(--cyan),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.gold-text{color:var(--gold);}
+.green-text{color:var(--green);}
+.red-text{color:var(--red);}
+.cyan-text{color:var(--cyan);}
+.muted{color:var(--text2);}
+.dim{color:var(--text3);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect,useMemo,useRef,useCallback}=React;
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+const getToday=()=>new Date().toISOString().slice(0,10);
+const getPrev=d=>{const dt=new Date(d);dt.setDate(dt.getDate()-1);return dt.toISOString().slice(0,10);};
+const fmtMMK=n=>(n||0).toLocaleString("en-US")+" Ks";
+const fmtK=n=>n>=1000?(n/1000).toFixed(n%1000===0?0:1)+"K":String(n);
+const fmtDate=s=>new Date(s+"T00:00:00").toLocaleDateString("my-MM",{year:"numeric",month:"long",day:"numeric",weekday:"short"});
+const fmtDateShort=s=>new Date(s+"T00:00:00").toLocaleDateString("my-MM",{month:"short",day:"numeric",weekday:"short"});
+const uid=()=>"c_"+Date.now()+"_"+Math.random().toString(36).slice(2,6);
+function loadLS(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}}
+function saveLS(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+function extractRoad(addr){
+  if(!addr)return"လိပ်စာမသိ";
+  const parts=addr.split(/[,၊]/);
+  for(const p of parts){const t=p.trim();if(t.includes("လမ်း"))return t;}
+  return parts[0]?.trim()||"လိပ်စာမသိ";
+}
+const openMaps=address=>{
+  window.open("https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(address+", Myanmar"),"_blank");
+};
+
+const DENOMS=[10000,5000,1000,500,200,100,50];
+const SC={
+  pending:{label:"မသွားရသေး",cls:"badge-pending",dot:"#8899bb",cardCls:"cust-card-pending"},
+  collected:{label:"ငွေသိမ်းပြီး",cls:"badge-collected",dot:"#00e5a0",cardCls:"cust-card-collected"},
+  absent:{label:"မတွေ့",cls:"badge-absent",dot:"#ff4d6d",cardCls:"cust-card-absent"},
+  partial:{label:"တစ်ပိုင်းသိမ်း",cls:"badge-partial",dot:"#b06aff",cardCls:"cust-card-partial"},
+};
+
+// ─── BASE COMPONENTS ──────────────────────────────────────────────────────────
+function TopBar({title,onBack,extra,gradient=false}){
+  return(
+    <div className="topbar">
+      {onBack&&(
+        <button onClick={onBack} className="btn btn-ghost" style={{width:36,height:36,padding:0,borderRadius:10,fontSize:18,flexShrink:0}}>←</button>
+      )}
+      <span className={gradient?"gradient-text topbar-title":"topbar-title"}>{title}</span>
+      {extra&&<div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>{extra}</div>}
+    </div>
+  );
+}
+
+function Badge({status}){
+  const c=SC[status]||SC.pending;
+  return(
+    <span className={`badge ${c.cls}`}>
+      <span className="badge-dot" style={{background:c.dot}}/>
+      {c.label}
+    </span>
+  );
+}
+
+function NavBtn({icon,label,active,onClick,badge=false}){
+  return(
+    <button className={`nav-item ${active?"active":""}`} onClick={onClick}>
+      <span className="nav-icon">{icon}</span>
+      {badge&&<span className="nav-dot"/>}
+      {label}
+    </button>
+  );
+}
+
+function IconBtn({icon,onClick,variant="ghost",style={}}){
+  return(
+    <button onClick={onClick} className={`btn btn-${variant}`}
+      style={{width:36,height:36,padding:0,borderRadius:10,fontSize:16,...style}}>
+      {icon}
+    </button>
+  );
+}
+
+// ─── ANIMATED MONEY ───────────────────────────────────────────────────────────
+function MoneyAmt({value,size="md",color="gold",style={}}){
+  const cls=`money money-${color} ${size==="lg"?"money-lg":""}`;
+  return<span className={cls} style={style} key={value}>{fmtMMK(value)}</span>;
+}
+
+// ─── MONEY COUNTER ────────────────────────────────────────────────────────────
+function MoneyCounter({onConfirm,onClose}){
+  const[counts,setCounts]=useState(()=>Object.fromEntries(DENOMS.map(d=>[d,0])));
+  const total=useMemo(()=>DENOMS.reduce((s,d)=>s+d*counts[d],0),[counts]);
+  const adj=(d,delta)=>setCounts(p=>({...p,[d]:Math.max(0,p[d]+delta)}));
+  return(
+    <div className="sheet-overlay">
+      <div className="sheet" style={{padding:0}}>
+        <div className="sheet-handle"/>
+        <div style={{padding:"16px 20px 8px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontWeight:800,fontSize:18}}>🧮 ငွေရေတွက်</span>
+          <button onClick={onClose} className="btn btn-ghost" style={{padding:"6px 14px",borderRadius:10,fontSize:13}}>ပိတ်</button>
+        </div>
+        <div style={{padding:"0 16px 48px"}}>
+          {DENOMS.map(d=>(
+            <div key={d} className="card" style={{display:"flex",alignItems:"center",gap:12,marginBottom:8,padding:"11px 14px"}}>
+              <span className="mono gold-text" style={{fontWeight:700,fontSize:15,width:52}}>{fmtK(d)}</span>
+              <span className="mono dim" style={{fontSize:12,flex:1}}>×{counts[d]} = {fmtMMK(d*counts[d])}</span>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <button onClick={()=>adj(d,-1)} className="btn btn-ghost" style={{width:36,height:36,padding:0,borderRadius:10,fontSize:20}}>−</button>
+                <span className="mono" style={{fontWeight:800,minWidth:28,textAlign:"center",fontSize:17}}>{counts[d]}</span>
+                <button onClick={()=>adj(d,1)} className="btn btn-ghost" style={{width:36,height:36,padding:0,borderRadius:10,fontSize:20}}>+</button>
+              </div>
+            </div>
+          ))}
+          <div className="card card-green" style={{padding:"16px",margin:"12px 0",textAlign:"center"}}>
+            <div className="dim" style={{fontSize:11,marginBottom:6,fontWeight:700,letterSpacing:1}}>စုစုပေါင်းငွေ</div>
+            <MoneyAmt value={total} size="lg" color="green"/>
+          </div>
+          <button onClick={()=>onConfirm(total)} className="btn btn-success" style={{width:"100%",padding:15,fontSize:16,marginBottom:20}}>
+            ✓ အတည်ပြု — {fmtMMK(total)}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── PIN LOCK ─────────────────────────────────────────────────────────────────
+function PinLock({onUnlock}){
+  const[pin,setPin]=useState("");
+  const[err,setErr]=useState(false);
+  const[shake,setShake]=useState(false);
+  const[setup,setSetup]=useState(!loadLS("ct_pin",null));
+  const[confirm,setConfirm]=useState("");
+  const[step,setStep]=useState(1);
+  const stored=loadLS("ct_pin",null);
+
+  const doShake=()=>{setShake(true);setTimeout(()=>setShake(false),500);};
+
+  const press=d=>{
+    if(pin.length>=4)return;
+    const np=pin+d;
+    setPin(np);
+    if(np.length===4){
+      setTimeout(()=>{
+        if(setup){
+          if(step===1){setConfirm(np);setPin("");setStep(2);}
+          else{
+            if(np===confirm){saveLS("ct_pin",np);onUnlock();}
+            else{setErr(true);doShake();setPin("");setStep(1);setConfirm("");setTimeout(()=>setErr(false),800);}
+          }
+        } else {
+          if(np===stored){onUnlock();}
+          else{setErr(true);doShake();setPin("");setTimeout(()=>setErr(false),800);}
+        }
+      },120);
+    }
+  };
+  const del=()=>setPin(p=>p.slice(0,-1));
+
+  return(
+    <div className="view-wrap" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:32,background:"var(--bg)"}}>
+      {/* Logo */}
+      <div style={{marginBottom:40,textAlign:"center",animation:"scaleIn .4s ease both"}}>
+        <div style={{width:72,height:72,borderRadius:22,background:"linear-gradient(135deg,rgba(0,212,255,0.2),rgba(176,106,255,0.2))",border:"1px solid rgba(0,212,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,margin:"0 auto 16px",boxShadow:"0 0 40px rgba(0,212,255,0.15)"}}>
+          🛡
+        </div>
+        <div style={{fontWeight:900,fontSize:22,marginBottom:4}} className="gradient-text">Capital Taiyo</div>
+        <div className="dim" style={{fontSize:13}}>
+          {setup?(step===1?"PIN အသစ် သတ်မှတ်ပါ":"PIN ထပ်ရိုက်အတည်ပြုပါ"):"PIN ထည့်ပါ"}
+        </div>
+      </div>
+
+      {/* Dots */}
+      <div style={{display:"flex",gap:18,marginBottom:48,transform:shake?"translateX(0)":"none",animation:shake?"none":"none"}}
+        style={{display:"flex",gap:18,marginBottom:48,animation:shake?"none":"none",transform:shake?"none":"none"}}>
+        {[0,1,2,3].map(i=>(
+          <div key={i} className={`pin-dot ${i<pin.length?"filled":""} ${err?"error":""}`}
+            style={{transitionDelay:`${i*30}ms`}}/>
+        ))}
+      </div>
+
+      {err&&<div className="red-text" style={{fontSize:13,fontWeight:700,marginBottom:20,animation:"fadeUp .2s ease"}}>PIN မမှန်ပါ — ထပ်ကြိုးစားပါ</div>}
+
+      {/* Keypad */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,width:"100%",maxWidth:280}}>
+        {[1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((k,i)=>(
+          <button key={i} onClick={()=>{if(k==="⌫")del();else if(k!=="")press(String(k));}}
+            disabled={k===""}
+            className={k==="⌫"?"btn btn-danger pin-key":k===""?"btn pin-key":"btn pin-key"}
+            style={{opacity:k===""?0:1,cursor:k===""?"default":"pointer",
+              background:k==="⌫"?"rgba(255,77,109,0.12)":undefined,
+              borderColor:k==="⌫"?"rgba(255,77,109,0.3)":undefined}}>
+            {k}
+          </button>
+        ))}
+      </div>
+
+      {!setup&&(
+        <button onClick={()=>{if(window.confirm("PIN ဖျက်မည်လား?")){ saveLS("ct_pin",null);setSetup(true);setPin("");setStep(1);}}}
+          style={{marginTop:32,background:"none",border:"none",color:"var(--text3)",fontSize:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>
+          PIN မေ့သွားတယ်
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── DAILY TARGET BAR ─────────────────────────────────────────────────────────
+function DailyTargetBar({sessions,dailyIds,date}){
+  const[target,setTarget]=useState(()=>loadLS("ct_target_"+date,0));
+  const[editing,setEditing]=useState(false);
+  const[inp,setInp]=useState("");
+  const ids=dailyIds[date]||[];
+  const sess=sessions[date]||{};
+  const collected=ids.reduce((s,id)=>s+(sess[id]?.collected||0),0);
+  const rate=target>0?Math.min(100,Math.round(collected/target*100)):0;
+  const save=()=>{const v=parseInt(inp)||0;saveLS("ct_target_"+date,v);setTarget(v);setEditing(false);};
+  const color=rate>=100?"#00e5a0":rate>=50?"#f5a623":"#00d4ff";
+
+  if(!target&&!editing)return(
+    <button onClick={()=>setEditing(true)} className="btn btn-ghost"
+      style={{width:"100%",padding:"10px 16px",marginBottom:10,justifyContent:"flex-start",gap:8,borderStyle:"dashed"}}>
+      <span style={{fontSize:16}}>🎯</span>
+      <span className="dim" style={{fontSize:13}}>ဒီနေ့ Target သတ်မှတ်ရန် tap နှိပ်ပါ</span>
+    </button>
+  );
+  if(editing)return(
+    <div style={{display:"flex",gap:8,marginBottom:10}}>
+      <input autoFocus type="number" value={inp} onChange={e=>setInp(e.target.value)} placeholder="Target ပမာဏ (Ks)"
+        className="inp" onKeyDown={e=>e.key==="Enter"&&save()} style={{flex:1}}/>
+      <button onClick={save} className="btn btn-primary" style={{padding:"0 16px",borderRadius:12}}>✓</button>
+      <button onClick={()=>setEditing(false)} className="btn btn-ghost" style={{padding:"0 12px",borderRadius:12}}>✕</button>
+    </div>
+  );
+  return(
+    <div className="card" style={{padding:"12px 16px",marginBottom:10}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+        <span style={{fontSize:13,fontWeight:700}}>🎯 Target</span>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span className="mono" style={{color,fontWeight:800,fontSize:16,transition:"color .3s"}}>{rate}%</span>
+          <button onClick={()=>{setInp(String(target));setEditing(true);}} style={{background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:13}}>✏️</button>
+        </div>
+      </div>
+      <div className="progress-track" style={{height:8,marginBottom:8}}>
+        <div className="progress-fill" style={{width:`${rate}%`,background:`linear-gradient(90deg,${color},${color}bb)`}}/>
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between"}}>
+        <span className="mono dim" style={{fontSize:11}}>{fmtMMK(collected)}</span>
+        <span className="mono dim" style={{fontSize:11}}>{fmtMMK(target)} {rate>=100&&"✓"}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── ADD TODAY MODAL ──────────────────────────────────────────────────────────
+function AddTodayModal({profiles,dailyIds,date,onAdd,onClose}){
+  const[tab,setTab]=useState("pick");
+  const[search,setSearch]=useState("");
+  const[form,setForm]=useState({name:"",policy:"",phone:"",address:"",amountDue:""});
+  const[selId,setSelId]=useState(null);
+  const[customAmt,setCustomAmt]=useState("");
+  const existingIds=dailyIds[date]||[];
+  const filtered=Object.values(profiles).filter(p=>{
+    if(existingIds.includes(p.id))return false;
+    const q=search.toLowerCase();
+    return!q||p.name?.toLowerCase().includes(q)||p.policy?.toLowerCase().includes(q);
+  });
+  const setF=(k,v)=>setForm(p=>({...p,[k]:v}));
+  const validNew=form.name&&form.policy&&form.amountDue;
+  const handlePick=()=>{
+    if(!selId)return;
+    const p=profiles[selId];
+    onAdd({profileId:selId,amountDue:customAmt?parseInt(customAmt):p.defaultAmountDue||0});
+    onClose();
+  };
+  const handleNew=()=>{
+    if(!validNew)return;
+    const id=uid();
+    onAdd({isNew:true,profile:{id,name:form.name,policy:form.policy,phone:form.phone,address:form.address,defaultAmountDue:parseInt(form.amountDue)||0},amountDue:parseInt(form.amountDue)||0,profileId:id});
+    onClose();
+  };
+  return(
+    <div className="sheet-overlay">
+      <div className="sheet">
+        <div className="sheet-handle"/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px 12px"}}>
+          <span style={{fontWeight:800,fontSize:17}}>➕ ဒီနေ့ Customer ထည့်</span>
+          <button onClick={onClose} className="btn btn-ghost" style={{padding:"6px 14px",borderRadius:10,fontSize:13}}>ပိတ်</button>
+        </div>
+        <div className="tab-bar" style={{margin:"0 16px"}}>
+          <button className={`tab-btn ${tab==="pick"?"active":""}`} onClick={()=>setTab("pick")}>📋 Profile ရွေး</button>
+          <button className={`tab-btn ${tab==="new"?"active":""}`} onClick={()=>setTab("new")}>✨ အသစ်ထည့်</button>
+        </div>
+        <div style={{padding:"12px 16px 24px",maxHeight:"70vh",overflowY:"auto"}}>
+          {tab==="pick"?(
+            <>
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 အမည် / Policy ရှာပါ" className="inp" style={{marginBottom:12}}/>
+              {filtered.length===0&&<div className="dim" style={{textAlign:"center",padding:24,fontSize:14}}>Profile မတွေ့ပါ</div>}
+              {filtered.map(p=>(
+                <div key={p.id} onClick={()=>setSelId(selId===p.id?null:p.id)}
+                  className={`card ${selId===p.id?"card-green":""}`}
+                  style={{padding:"13px 16px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{p.name}</div>
+                    <div className="dim" style={{fontSize:12}}>{p.policy}{p.phone?` · ${p.phone}`:""}</div>
+                    {p.address&&<div style={{color:"var(--text3)",fontSize:11,marginTop:2}}>{p.address}</div>}
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <div className="gold-text mono" style={{fontWeight:700,fontSize:13}}>{fmtMMK(p.defaultAmountDue)}</div>
+                    {selId===p.id&&<div className="green-text" style={{fontSize:18}}>✓</div>}
+                  </div>
+                </div>
+              ))}
+              {selId&&(
+                <>
+                  <div className="dim" style={{fontSize:12,marginBottom:6,marginTop:4}}>ဒီနေ့ ကောက်ရမည့်ပမာဏ (မပြောင်းရင် ထားခဲ့)</div>
+                  <input type="number" value={customAmt} onChange={e=>setCustomAmt(e.target.value)}
+                    placeholder={`Default: ${fmtMMK(profiles[selId]?.defaultAmountDue)}`} className="inp" style={{marginBottom:12}}/>
+                  <button onClick={handlePick} className="btn btn-success" style={{width:"100%",padding:14,fontSize:15}}>✓ List ထဲ ထည့်မည်</button>
+                </>
+              )}
+            </>
+          ):(
+            <>
+              {[{k:"name",l:"အမည် *",ph:"ဦးအောင်ကြည်"},{k:"policy",l:"Policy *",ph:"CT-2024-001"},{k:"phone",l:"ဖုန်းနံပါတ်",ph:"09-XXXX-XXXXX"}].map(({k,l,ph})=>(
+                <div key={k} style={{marginBottom:12}}>
+                  <div className="dim" style={{fontSize:12,marginBottom:5,fontWeight:700}}>{l}</div>
+                  <input type="text" value={form[k]} onChange={e=>setF(k,e.target.value)} placeholder={ph} className="inp"/>
+                </div>
+              ))}
+              <div style={{marginBottom:12}}>
+                <div className="dim" style={{fontSize:12,marginBottom:5,fontWeight:700}}>လိပ်စာ</div>
+                <textarea value={form.address} onChange={e=>setF("address",e.target.value)} placeholder="အမှတ်၃၆၀၊ နွယ်သာကီလမ်း၊ ဆရပ်ကွက်" rows={2} className="inp"/>
+                <div style={{color:"var(--text3)",fontSize:11,marginTop:3}}>💡 လမ်းအမည်ပါမှ auto-group ဖြစ်မည်</div>
+              </div>
+              <div style={{marginBottom:16}}>
+                <div className="dim" style={{fontSize:12,marginBottom:5,fontWeight:700}}>ကောက်ခံရမည့် ပမာဏ (Ks) *</div>
+                <input type="number" value={form.amountDue} onChange={e=>setF("amountDue",e.target.value)} placeholder="15000" className="inp"/>
+              </div>
+              <button onClick={handleNew} disabled={!validNew} className={`btn ${validNew?"btn-primary":"btn-ghost"}`} style={{width:"100%",padding:14,fontSize:15}}>
+                Profile ဖန်တီး + List ထဲ ထည့်မည်
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── COLLECTION DETAIL ────────────────────────────────────────────────────────
+function CollectionDetail({custId,profiles,sessions,date,onBack,onSave,onReceipt,readOnly}){
+  const p=profiles[custId];
+  const sess=(sessions[date]||{})[custId]||{status:"pending",collected:0,notes:"",amountDue:p?.defaultAmountDue||0};
+  const amtDue=sess.amountDue||p?.defaultAmountDue||0;
+  const[showCtr,setShowCtr]=useState(false);
+  const[inp,setInp]=useState(sess.collected>0?String(sess.collected):"");
+  const[notes,setNotes]=useState(sess.notes||"");
+  const collected=parseInt(inp)||0;
+  const noteHistory=useMemo(()=>{
+    const hist=[];
+    Object.entries(sessions).forEach(([d,ds])=>{
+      if(d===date)return;
+      const s=ds[custId];
+      if(s?.notes)hist.push({date:d,notes:s.notes,status:s.status,collected:s.collected||0});
+    });
+    return hist.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
+  },[sessions,custId,date]);
+  if(!p)return null;
+  const save=status=>{onSave(custId,{status,collected,notes,amountDue:amtDue});onBack();};
+  const diff=amtDue-collected;
+  return(
+    <div className="view-wrap page-slide">
+      <TopBar title={p.name} onBack={onBack}/>
+      {showCtr&&<MoneyCounter onClose={()=>setShowCtr(false)} onConfirm={t=>{setInp(String(t));setShowCtr(false);}}/>}
+      <div style={{padding:16,display:"flex",flexDirection:"column",gap:14}} className="pb-nav">
+
+        {/* Profile card */}
+        <div className="card stagger-1" style={{padding:16}}>
+          <div className="section-label">Customer အချက်အလက်</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:10}}>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:800,fontSize:18,marginBottom:2}}>{p.name}</div>
+              <div className="mono cyan-text" style={{fontSize:13,fontWeight:600}}>{p.policy}</div>
+            </div>
+            <Badge status={sess.status}/>
+          </div>
+          {p.phone&&(
+            <a href={"tel:"+p.phone.replace(/[^0-9+]/g,"")}
+              className="btn btn-ghost"
+              style={{width:"100%",padding:"10px",marginBottom:8,display:"flex",gap:8,justifyContent:"center",borderColor:"rgba(0,212,255,0.3)",color:"var(--cyan)"}}>
+              📞 {p.phone} — 3CX
+            </a>
+          )}
+          {p.address&&(
+            <div>
+              <div className="dim" style={{fontSize:12,marginBottom:6}}>{p.address}</div>
+              <button onClick={()=>openMaps(p.address)} className="btn btn-ghost"
+                style={{width:"100%",padding:"9px",display:"flex",gap:8,justifyContent:"center",borderColor:"rgba(0,212,255,0.2)",color:"var(--cyan)",fontSize:12}}>
+                🗺 Google Maps Navigation
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Amount */}
+        <div className="card card-gold stagger-2" style={{padding:16,textAlign:"center"}}>
+          <div className="dim" style={{fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:8,textTransform:"uppercase"}}>ကောက်ခံရမည့် ပမာဏ</div>
+          <MoneyAmt value={amtDue} size="lg" color="gold"/>
+        </div>
+
+        {/* Collection input */}
+        {readOnly?(
+          <div className="card stagger-2" style={{padding:16}}>
+            <div className="section-label">ကောက်ခဲ့သောငွေ</div>
+            <MoneyAmt value={sess.collected} size="lg" color="green"/>
+            {sess.notes&&<div className="muted" style={{fontSize:13,marginTop:8}}>📝 {sess.notes}</div>}
+          </div>
+        ):(
+          <div className="card stagger-3" style={{padding:16}}>
+            <div className="section-label">ငွေသိမ်း</div>
+            <div style={{display:"flex",gap:8,marginBottom:12}}>
+              <input type="number" value={inp} onChange={e=>setInp(e.target.value)} placeholder="ရရှိသောငွေ" className="inp" style={{flex:1}}/>
+              <button onClick={()=>setShowCtr(true)} className="btn btn-gold" style={{padding:"0 14px",borderRadius:12,whiteSpace:"nowrap"}}>🧮</button>
+            </div>
+            {collected>0&&collected<amtDue&&(
+              <div className="card card-red" style={{padding:"10px 14px",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span className="red-text" style={{fontSize:13}}>⚠ ကျန်ငွေ</span>
+                <span className="mono red-text" style={{fontWeight:700}}>{fmtMMK(diff)}</span>
+              </div>
+            )}
+            {collected>=amtDue&&collected>0&&(
+              <div className="card card-green" style={{padding:"10px 14px",marginBottom:10,textAlign:"center"}}>
+                <span className="green-text" style={{fontWeight:700,fontSize:13}}>
+                  ✓ {collected>amtDue?`${fmtMMK(collected-amtDue)} ပိုရ`:"တိတိကိုက်"}
+                </span>
+              </div>
+            )}
+            <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="မှတ်ချက် (ဥပမာ - နောက်လာဆိုတယ်)" rows={2} className="inp"/>
+          </div>
+        )}
+
+        {/* Note history */}
+        {noteHistory.length>0&&(
+          <div className="card stagger-4" style={{padding:16}}>
+            <div className="section-label">📝 မှတ်တမ်းဟောင်း</div>
+            {noteHistory.map(h=>(
+              <div key={h.date} style={{marginBottom:10,paddingBottom:10,borderBottom:"1px solid var(--border)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                  <span className="dim" style={{fontSize:11}}>{fmtDate(h.date)}</span>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <span className="mono green-text" style={{fontSize:11}}>{fmtMMK(h.collected)}</span>
+                    <Badge status={h.status}/>
+                  </div>
+                </div>
+                <div className="muted" style={{fontSize:13}}>{h.notes}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Action buttons */}
+        {!readOnly&&(
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <button onClick={()=>save("collected")} className="btn btn-success" style={{padding:15,fontSize:16,width:"100%"}}>
+              ✓ ငွေသိမ်းပြီး — သိမ်းဆည်း
+            </button>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>save("partial")} className="btn btn-purple" style={{flex:1,padding:13,fontSize:14}}>တစ်ပိုင်းသိမ်း</button>
+              <button onClick={()=>save("absent")} className="btn btn-danger" style={{flex:1,padding:13,fontSize:14}}>မတွေ့ / မရှိ</button>
+            </div>
+            {onReceipt&&sess.collected>0&&(
+              <button onClick={()=>onReceipt(custId)} className="btn btn-gold" style={{width:"100%",padding:13,fontSize:14}}>
+                🧾 ဖြတ်ပိုင်းကြည့်မည်
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── DAY VIEW ─────────────────────────────────────────────────────────────────
+function DayView({date,profiles,sessions,dailyIds,onSelect,search,showTarget=false}){
+  const ids=dailyIds[date]||[];
+  const sess=sessions[date]||{};
+  const filtered=ids.filter(id=>{
+    const p=profiles[id];if(!p)return false;
+    if(!search)return true;
+    const q=search.toLowerCase();
+    return p.name?.toLowerCase().includes(q)||p.policy?.toLowerCase().includes(q)||p.address?.toLowerCase().includes(q);
+  });
+  const grouped=useMemo(()=>{
+    const g={};
+    for(const id of filtered){
+      const p=profiles[id];if(!p)continue;
+      const road=extractRoad(p.address);
+      if(!g[road])g[road]=[];
+      g[road].push(id);
+    }
+    return g;
+  },[filtered,profiles]);
+
+  if(ids.length===0)return(
+    <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:40,gap:16,textAlign:"center"}}>
+      <div style={{fontSize:56,opacity:.15,animation:"floatDot 3s ease-in-out infinite"}}>📋</div>
+      <div className="dim" style={{fontSize:14}}>+ နှိပ်ပြီး ဒီနေ့ customer ထည့်ပါ</div>
+    </div>
+  );
+
+  return(
+    <div style={{flex:1,padding:"0 16px",paddingBottom:20}}>
+      {Object.entries(grouped).map(([road,rids])=>(
+        <div key={road}>
+          <div className="road-divider">
+            <div className="road-divider-line"/>
+            <span className="road-pill">📍 {road}</span>
+            <div className="road-divider-line"/>
+          </div>
+          {rids.map((id,i)=>{
+            const p=profiles[id];
+            const s=sess[id]||{status:"pending"};
+            const amt=s.amountDue||p?.defaultAmountDue||0;
+            return(
+              <div key={id} className={`cust-card ${SC[s.status]?.cardCls||"cust-card-pending"}`}
+                style={{animationDelay:`${i*40}ms`}}>
+                <div style={{padding:"13px 14px",cursor:"pointer"}} onClick={()=>onSelect(id)}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:6}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:14,marginBottom:3}}>{p?.name}</div>
+                      <div className="mono dim" style={{fontSize:11,marginBottom:2}}>{p?.policy}</div>
+                      {p?.address&&<div style={{color:"var(--text3)",fontSize:11,lineHeight:1.4}}>{p.address}</div>}
+                      {s.notes&&<div className="muted" style={{fontSize:11,marginTop:3}}>📝 {s.notes.slice(0,35)}{s.notes.length>35?"…":""}</div>}
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div className="mono gold-text" style={{fontWeight:700,fontSize:14,marginBottom:4}}>{fmtMMK(amt)}</div>
+                      {s.collected>0&&<div className="mono green-text" style={{fontSize:11,marginBottom:4}}>✓ {fmtMMK(s.collected)}</div>}
+                      <Badge status={s.status}/>
+                    </div>
+                  </div>
+                </div>
+                {p?.phone&&(
+                  <div style={{borderTop:"1px solid var(--border)",padding:"8px 14px"}}>
+                    <a href={"tel:"+p.phone.replace(/[^0-9+]/g,"")}
+                      style={{display:"flex",alignItems:"center",gap:6,color:"var(--cyan)",fontWeight:700,fontSize:12}}>
+                      📞 {p.phone}
+                    </a>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+      {filtered.length===0&&ids.length>0&&<div className="dim" style={{textAlign:"center",padding:30}}>ရှာဖွေမှု ကိုက်ညီသူ မရှိ</div>}
+    </div>
+  );
+}
+
+// ─── EDIT PROFILE MODAL ───────────────────────────────────────────────────────
+function EditProfileModal({profile,onSave,onClose}){
+  const[form,setForm]=useState({name:profile?.name||"",policy:profile?.policy||"",phone:profile?.phone||"",address:profile?.address||"",defaultAmountDue:profile?.defaultAmountDue||""});
+  const setF=(k,v)=>setForm(p=>({...p,[k]:v}));
+  const valid=form.name&&form.policy;
+  return(
+    <div className="sheet-overlay">
+      <div className="sheet">
+        <div className="sheet-handle"/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px 12px"}}>
+          <span style={{fontWeight:800,fontSize:17}}>✏️ Profile ပြင်မည်</span>
+          <button onClick={onClose} className="btn btn-ghost" style={{padding:"6px 14px",borderRadius:10,fontSize:13}}>ပိတ်</button>
+        </div>
+        <div style={{padding:"0 16px 48px"}}>
+          {[{k:"name",l:"အမည် *",ph:"ဦးအောင်ကြည်"},{k:"policy",l:"Policy *",ph:"CT-2024-001"},{k:"phone",l:"ဖုန်းနံပါတ်",ph:"09-XXXX-XXXXX"}].map(({k,l,ph})=>(
+            <div key={k} style={{marginBottom:12}}>
+              <div className="dim" style={{fontSize:12,marginBottom:5,fontWeight:700}}>{l}</div>
+              <input type="text" value={form[k]} onChange={e=>setF(k,e.target.value)} placeholder={ph} className="inp"/>
+            </div>
+          ))}
+          <div style={{marginBottom:12}}>
+            <div className="dim" style={{fontSize:12,marginBottom:5,fontWeight:700}}>လိပ်စာ</div>
+            <textarea value={form.address} onChange={e=>setF("address",e.target.value)} rows={2} className="inp"/>
+          </div>
+          <div style={{marginBottom:16}}>
+            <div className="dim" style={{fontSize:12,marginBottom:5,fontWeight:700}}>Default ကောက်ခံပမာဏ</div>
+            <input type="number" value={form.defaultAmountDue} onChange={e=>setF("defaultAmountDue",e.target.value)} placeholder="15000" className="inp"/>
+          </div>
+          <button onClick={()=>onSave({...profile,...form,defaultAmountDue:parseInt(form.defaultAmountDue)||0})} disabled={!valid}
+            className={`btn ${valid?"btn-primary":"btn-ghost"}`} style={{width:"100%",padding:14,fontSize:15}}>
+            သိမ်းဆည်း
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── PROFILES LIST ────────────────────────────────────────────────────────────
+function ProfilesList({profiles,sessions,onBack,onEdit,onDelete}){
+  const[search,setSearch]=useState("");
+  const list=Object.values(profiles).filter(p=>{
+    const q=search.toLowerCase();
+    return!q||p.name?.toLowerCase().includes(q)||p.policy?.toLowerCase().includes(q);
+  });
+  const lastSeen=id=>{
+    const dates=Object.keys(sessions).sort().reverse();
+    for(const d of dates){if(sessions[d]?.[id])return d;}
+    return null;
+  };
+  return(
+    <div className="view-wrap page-slide">
+      <TopBar title="👥 Customer Profiles" onBack={onBack}/>
+      <div style={{padding:"12px 16px"}} className="pb-nav">
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 အမည် / Policy ရှာပါ" className="inp" style={{marginBottom:10}}/>
+        <div className="dim" style={{fontSize:12,marginBottom:12}}>{list.length} profile</div>
+        {list.map((p,i)=>{
+          const ls=lastSeen(p.id);
+          return(
+            <div key={p.id} className="card" style={{padding:"13px 14px",marginBottom:10,animation:`fadeUp .25s ease both`,animationDelay:`${i*30}ms`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{p.name}</div>
+                  <div className="mono dim" style={{fontSize:12}}>{p.policy}</div>
+                  {p.address&&<div style={{color:"var(--text3)",fontSize:11,marginTop:2}}>{p.address}</div>}
+                  {ls&&<div className="dim" style={{fontSize:11,marginTop:2}}>နောက်ဆုံး: {fmtDate(ls)}</div>}
+                </div>
+                <div className="mono gold-text" style={{fontWeight:700,fontSize:13,flexShrink:0}}>{fmtMMK(p.defaultAmountDue)}</div>
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {p.phone&&(
+                  <a href={"tel:"+p.phone.replace(/[^0-9+]/g,"")} className="btn btn-ghost"
+                    style={{flex:1,padding:"8px",display:"flex",gap:6,justifyContent:"center",borderColor:"rgba(0,212,255,0.3)",color:"var(--cyan)",fontSize:12}}>
+                    📞 {p.phone}
+                  </a>
+                )}
+                {p.address&&(
+                  <button onClick={()=>openMaps(p.address)} className="btn btn-ghost"
+                    style={{padding:"8px 12px",borderColor:"rgba(0,212,255,0.2)",color:"var(--cyan)",fontSize:13}}>🗺</button>
+                )}
+                <button onClick={()=>onEdit(p)} className="btn btn-ghost" style={{padding:"8px 12px",fontSize:13}}>✏️</button>
+                <button onClick={()=>onDelete(p.id)} className="btn btn-danger" style={{padding:"8px 12px",fontSize:13}}>🗑</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── RECEIPT ──────────────────────────────────────────────────────────────────
+function Receipt({custId,date,profiles,sessions,onClose}){
+  const p=profiles[custId];
+  const s=(sessions[date]||{})[custId]||{};
+  const[shared,setShared]=useState(false);
+  const now=new Date();
+  const timeStr=now.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit",hour12:true});
+  const receiptText=`╔════════════════════════╗\n  Capital Taiyo Insurance\n  ငွေလက်ခံဖြတ်ပိုင်း\n╠════════════════════════╣\n ရက်  : ${fmtDate(date)}\n အချိန်: ${timeStr}\n━━━━━━━━━━━━━━━━━━━━━━━━\n Policy: ${p?.policy||"—"}\n အမည် : ${p?.name||"—"}\n━━━━━━━━━━━━━━━━━━━━━━━━\n ကောက်ရမည်: ${fmtMMK(s.amountDue||0)}\n ပေးသွင်း : ${fmtMMK(s.collected||0)}\n${(s.amountDue||0)>(s.collected||0)?" ကျန်ငွေ  : "+fmtMMK((s.amountDue||0)-(s.collected||0)):" ✓ ပြည့်ပြည့်ဝဝ ပေးပြီး"}${s.notes?"\n မှတ်ချက် : "+s.notes:""}\n╚════════════════════════╝\n  ကျေးဇူးတင်ပါသည် 🙏`;
+  const share=async()=>{
+    if(navigator.share){try{await navigator.share({title:"Receipt",text:receiptText});setShared(true);setTimeout(()=>setShared(false),2000);}catch{}}
+    else{navigator.clipboard?.writeText(receiptText);setShared(true);setTimeout(()=>setShared(false),2000);}
+  };
+  return(
+    <div className="sheet-overlay">
+      <div className="sheet">
+        <div className="sheet-handle"/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px 12px"}}>
+          <span style={{fontWeight:800,fontSize:17}}>🧾 ငွေလက်ခံဖြတ်ပိုင်း</span>
+          <button onClick={onClose} className="btn btn-ghost" style={{padding:"6px 14px",borderRadius:10,fontSize:13}}>ပိတ်</button>
+        </div>
+        <div style={{padding:"0 16px 48px"}}>
+          <div style={{background:"rgba(0,0,0,0.4)",border:"1px solid var(--border2)",borderRadius:14,padding:20,marginBottom:16}}>
+            <div style={{textAlign:"center",marginBottom:16}}>
+              <div className="cyan-text" style={{fontWeight:800,fontSize:16}}>Capital Taiyo Insurance</div>
+              <div className="dim" style={{fontSize:12}}>ငွေလက်ခံဖြတ်ပိုင်း</div>
+            </div>
+            <div style={{borderTop:"1px dashed var(--border2)",borderBottom:"1px dashed var(--border2)",padding:"12px 0",marginBottom:12}}>
+              {[{l:"ရက်စွဲ",v:fmtDate(date)},{l:"အချိန်",v:timeStr},{l:"Policy",v:p?.policy||"—"},{l:"အမည်",v:p?.name||"—"}].map(({l,v})=>(
+                <div key={l} style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                  <span className="dim" style={{fontSize:12}}>{l}</span>
+                  <span style={{fontSize:12,fontWeight:600,textAlign:"right",maxWidth:"60%"}}>{v}</span>
+                </div>
+              ))}
+              {p?.address&&<div className="dim" style={{fontSize:11,marginTop:4}}>{p.address}</div>}
+            </div>
+            <div style={{marginBottom:10}}>
+              {[{l:"ကောက်ရမည်",v:fmtMMK(s.amountDue||0),c:"var(--text2)"},{l:"ပေးသွင်းငွေ",v:fmtMMK(s.collected||0),c:"var(--green)"}].map(({l,v,c})=>(
+                <div key={l} style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                  <span className="dim" style={{fontSize:13}}>{l}</span>
+                  <span className="mono" style={{color:c,fontSize:16,fontWeight:800}}>{v}</span>
+                </div>
+              ))}
+              {(s.amountDue||0)>(s.collected||0)?(
+                <div style={{display:"flex",justifyContent:"space-between"}}>
+                  <span className="red-text" style={{fontSize:13}}>ကျန်ငွေ</span>
+                  <span className="mono red-text" style={{fontSize:15,fontWeight:800}}>{fmtMMK((s.amountDue||0)-(s.collected||0))}</span>
+                </div>
+              ):(
+                <div style={{textAlign:"center"}} className="green-text" style={{fontSize:13,fontWeight:700,textAlign:"center"}}>✓ ပြည့်ပြည့်ဝဝ ပေးပြီး</div>
+              )}
+            </div>
+            {s.notes&&<div style={{background:"var(--glass)",borderRadius:8,padding:"8px 12px",fontSize:12}} className="muted">📝 {s.notes}</div>}
+            <div style={{borderTop:"1px dashed var(--border2)",paddingTop:12,marginTop:12,textAlign:"center"}}>
+              <Badge status={s.status||"pending"}/>
+              <div className="dim" style={{fontSize:11,marginTop:8}}>ကျေးဇူးတင်ပါသည် 🙏</div>
+            </div>
+          </div>
+          <button onClick={share} className={`btn ${shared?"btn-success":"btn-primary"}`} style={{width:"100%",padding:14,fontSize:15}}>
+            {shared?"✓ ပြီးပြီ!":(navigator.share?"📤 Share / Send":"📋 Copy ကူး")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── REPORT VIEW ──────────────────────────────────────────────────────────────
+function ReportView({date,profiles,sessions,dailyIds,onBack}){
+  const ids=dailyIds[date]||[];
+  const sess=sessions[date]||{};
+  const totalC=ids.reduce((s,id)=>s+(sess[id]?.collected||0),0);
+  const totalD=ids.reduce((s,id)=>s+(sess[id]?.amountDue||profiles[id]?.defaultAmountDue||0),0);
+  const stats={collected:0,partial:0,absent:0,pending:0};
+  ids.forEach(id=>{const st=(sess[id]?.status)||"pending";if(stats[st]!==undefined)stats[st]++;});
+  const txt=`=== Capital Taiyo Cash Collection ===\n${fmtDate(date)}\n${"─".repeat(38)}\nCustomer: ${ids.length}ဦး | ✓${stats.collected} | ~${stats.partial} | ✗${stats.absent} | ⏳${stats.pending}\n${"─".repeat(38)}\nကောက်ခံရမည်: ${fmtMMK(totalD)}\nကောက်ခံရရှိ: ${fmtMMK(totalC)}\nကွာဟချက်:   ${fmtMMK(totalD-totalC)}\n${"─".repeat(38)}\n${ids.map(id=>{const p=profiles[id];const s=sess[id]||{};return`${s.status==="collected"?"✓":s.status==="absent"?"✗":"~"} ${p?.name}(${p?.policy}) ${fmtMMK(s.collected||0)}${s.notes?` [${s.notes}]`:""}`}).join("\n")}`;
+  const[cp,setCp]=useState(false);
+  const rate=totalD>0?Math.round(totalC/totalD*100):0;
+  const rateColor=rate>=80?"var(--green)":rate>=50?"var(--gold)":"var(--red)";
+  return(
+    <div className="view-wrap page-slide">
+      <TopBar title="📊 Report" onBack={onBack}/>
+      <div style={{padding:16,display:"flex",flexDirection:"column",gap:12}} className="pb-nav">
+        <div className="dim" style={{fontSize:12,textAlign:"center"}}>{fmtDate(date)}</div>
+
+        {/* Rate hero */}
+        <div className="card" style={{padding:20,textAlign:"center"}}>
+          <div className="dim" style={{fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>ကောက်ခံနှုန်း</div>
+          <div style={{fontSize:48,fontWeight:900,color:rateColor,fontFamily:"'DM Mono',monospace",marginBottom:12}}>{rate}%</div>
+          <div className="progress-track" style={{height:10,marginBottom:10}}>
+            <div className="progress-fill" style={{width:`${rate}%`,background:`linear-gradient(90deg,${rateColor},${rateColor}88)`}}/>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between"}}>
+            <span className="mono green-text" style={{fontSize:13,fontWeight:700}}>{fmtMMK(totalC)}</span>
+            <span className="mono muted" style={{fontSize:13}}>{fmtMMK(totalD)}</span>
+          </div>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {[{l:"ကောက်ခံရမည်",v:fmtMMK(totalD),c:"var(--text2)"},{l:"ကောက်ခံရရှိ",v:fmtMMK(totalC),c:"var(--green)"},{l:"ကွာဟချက်",v:fmtMMK(totalD-totalC),c:totalD>totalC?"var(--red)":"var(--green)"},{l:"Customer",v:`${ids.length}ဦး`,c:"var(--cyan)"}].map(({l,v,c})=>(
+            <div key={l} className="card" style={{padding:14,textAlign:"center"}}>
+              <div className="dim" style={{fontSize:11,marginBottom:4}}>{l}</div>
+              <div className="mono" style={{color:c,fontWeight:800,fontSize:14}}>{v}</div>
+            </div>
+          ))}
+        </div>
+        <div className="card" style={{padding:16}}>
+          <div className="section-label">Status</div>
+          {Object.entries(stats).map(([st,n])=>(
+            <div key={st} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <Badge status={st}/><span style={{fontWeight:700}}>{n}ဦး</span>
+            </div>
+          ))}
+        </div>
+        <div className="card" style={{padding:16}}>
+          <div className="section-label">Customer အသေးစိတ်</div>
+          {ids.map(id=>{const p=profiles[id];const s=sess[id]||{};return(
+            <div key={id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,paddingBottom:10,borderBottom:"1px solid var(--border)"}}>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:600,fontSize:14,marginBottom:2}}>{p?.name}</div>
+                <div className="mono dim" style={{fontSize:11}}>{p?.policy}</div>
+                {s.notes&&<div className="muted" style={{fontSize:12,marginTop:2}}>📝{s.notes}</div>}
+              </div>
+              <div style={{textAlign:"right",flexShrink:0}}>
+                <div className="mono" style={{color:s.status==="collected"?"var(--green)":s.status==="absent"?"var(--red)":"var(--gold)",fontWeight:700,fontSize:14,marginBottom:3}}>{fmtMMK(s.collected||0)}</div>
+                <Badge status={s.status||"pending"}/>
+              </div>
+            </div>
+          );})}
+        </div>
+        <button onClick={()=>{navigator.clipboard?.writeText(txt);setCp(true);setTimeout(()=>setCp(false),2000);}}
+          className={`btn ${cp?"btn-success":"btn-ghost"}`} style={{width:"100%",padding:14,fontSize:15}}>
+          {cp?"✓ ကော်ပီကူးပြီး!":"📋 Report ကော်ပီကူး"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── HISTORY LIST ─────────────────────────────────────────────────────────────
+function HistoryList({sessions,dailyIds,profiles,onSelect,onBack}){
+  const today=getToday();
+  const dates=Object.keys(dailyIds).filter(d=>d!==today&&(dailyIds[d]||[]).length>0).sort().reverse();
+  return(
+    <div className="view-wrap page-slide">
+      <TopBar title="📅 မှတ်တမ်း" onBack={onBack}/>
+      <div style={{padding:"12px 16px"}} className="pb-nav">
+        {dates.length===0&&<div className="dim" style={{textAlign:"center",padding:40}}>မှတ်တမ်းမရှိသေး</div>}
+        {dates.map((date,i)=>{
+          const ids=dailyIds[date]||[];
+          const sess=sessions[date]||{};
+          const total=ids.reduce((s,id)=>s+(sess[id]?.collected||0),0);
+          const done=ids.filter(id=>sess[id]?.status==="collected").length;
+          const absent=ids.filter(id=>sess[id]?.status==="absent").length;
+          const rate=ids.length>0?Math.round(done/ids.length*100):0;
+          return(
+            <div key={date} className="card" style={{padding:"14px 16px",marginBottom:10,cursor:"pointer",animation:`fadeUp .25s ease both`,animationDelay:`${i*30}ms`}}
+              onClick={()=>onSelect(date)}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:8}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:14,marginBottom:3}}>{fmtDate(date)}</div>
+                  <div style={{display:"flex",gap:10}}>
+                    <span className="muted" style={{fontSize:12}}>👥{ids.length}</span>
+                    <span className="green-text" style={{fontSize:12}}>✓{done}</span>
+                    {absent>0&&<span className="red-text" style={{fontSize:12}}>✗{absent}</span>}
+                  </div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div className="mono green-text" style={{fontWeight:800,fontSize:15,marginBottom:3}}>{fmtMMK(total)}</div>
+                  <div style={{fontSize:11,color:rate>=80?"var(--green)":rate>=50?"var(--gold)":"var(--red)"}} className="mono">{rate}%</div>
+                </div>
+              </div>
+              <div className="progress-track" style={{height:4}}>
+                <div className="progress-fill" style={{width:`${rate}%`,background:`linear-gradient(90deg,var(--green),var(--cyan))`}}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── MONTHLY DASHBOARD ────────────────────────────────────────────────────────
+function MonthlyDashboard({profiles,sessions,dailyIds,onBack}){
+  const allDates=Object.keys(dailyIds).sort().reverse();
+  const months=[...new Set(allDates.map(d=>d.slice(0,7)))];
+  const[selMonth,setSelMonth]=useState(months[0]||getToday().slice(0,7));
+  const monthDates=allDates.filter(d=>d.startsWith(selMonth));
+  const stats=useMemo(()=>{
+    let totalC=0,totalD=0,collected=0,absent=0,partial=0,pending=0,customers=new Set();
+    for(const d of monthDates){
+      const ids=dailyIds[d]||[];const sess=sessions[d]||{};
+      for(const id of ids){
+        customers.add(id);const s=sess[id]||{};
+        totalC+=s.collected||0;totalD+=s.amountDue||profiles[id]?.defaultAmountDue||0;
+        if(s.status==="collected")collected++;
+        else if(s.status==="absent")absent++;
+        else if(s.status==="partial")partial++;
+        else pending++;
+      }
+    }
+    return{totalC,totalD,collected,absent,partial,pending,days:monthDates.length,customers:customers.size};
+  },[selMonth,sessions,dailyIds]);
+  const rate=stats.totalD>0?Math.round(stats.totalC/stats.totalD*100):0;
+  const rateColor=rate>=80?"var(--green)":rate>=50?"var(--gold)":"var(--red)";
+  const debtors=useMemo(()=>{
+    const debt={};
+    for(const d of Object.keys(sessions)){
+      const sess=sessions[d];
+      for(const[id,s] of Object.entries(sess)){
+        if(s.status==="absent"||(s.status==="partial"&&(s.amountDue||0)>(s.collected||0))){
+          if(!debt[id])debt[id]={count:0,totalOwed:0,lastDate:d};
+          const owed=(s.amountDue||0)-(s.collected||0);
+          debt[id].count++;debt[id].totalOwed+=owed>0?owed:0;
+          if(d>debt[id].lastDate)debt[id].lastDate=d;
+        }
+      }
+    }
+    return Object.entries(debt).map(([id,v])=>({id,profile:profiles[id],...v})).filter(d=>d.profile).sort((a,b)=>b.totalOwed-a.totalOwed);
+  },[sessions,profiles]);
+  const fmtMonth=m=>{const[y,mo]=m.split("-");return`${y} ${["","ဇန်","ဖေဖော်","မတ်","ဧပြီ","မေ","ဇွန်","ဇူ","သြ","စက်","အောက်","နို","ဒီ"][parseInt(mo)]}`;};
+  return(
+    <div className="view-wrap page-slide">
+      <TopBar title="📈 လစဉ် Summary" onBack={onBack}/>
+      <div style={{padding:16}} className="pb-nav">
+        <div style={{display:"flex",gap:8,overflowX:"auto",marginBottom:16,paddingBottom:4}}>
+          {months.map(m=>(
+            <button key={m} onClick={()=>setSelMonth(m)} className={`btn ${selMonth===m?"btn-primary":"btn-ghost"}`}
+              style={{padding:"7px 16px",borderRadius:99,whiteSpace:"nowrap",fontSize:13}}>
+              {fmtMonth(m)}
+            </button>
+          ))}
+        </div>
+        {/* Rate hero */}
+        <div className="card" style={{padding:20,textAlign:"center",marginBottom:12}}>
+          <div className="dim" style={{fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:8,textTransform:"uppercase"}}>လစဉ် ကောက်ခံနှုန်း</div>
+          <div style={{fontSize:52,fontWeight:900,color:rateColor,fontFamily:"'DM Mono',monospace",marginBottom:12,animation:"scaleIn .4s ease both"}}>{rate}%</div>
+          <div className="progress-track" style={{height:12,marginBottom:10}}>
+            <div className="progress-fill" style={{width:`${rate}%`,background:`linear-gradient(90deg,${rateColor},${rateColor}88)`,borderRadius:99}}/>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between"}}>
+            <span className="mono green-text" style={{fontWeight:700}}>{fmtMMK(stats.totalC)}</span>
+            <span className="mono muted">{fmtMMK(stats.totalD)}</span>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+          {[{l:"သွားရောက်ရက်",v:stats.days+"ရက်",c:"var(--cyan)"},{l:"Customers",v:stats.customers+"ဦး",c:"var(--purple)"},{l:"ငွေသိမ်းပြီး",v:stats.collected+"ကြိမ်",c:"var(--green)"},{l:"မတွေ့",v:stats.absent+"ကြိမ်",c:"var(--red)"},{l:"တစ်ပိုင်း",v:stats.partial+"ကြိမ်",c:"var(--purple)"},{l:"ကျန်ငွေ",v:fmtMMK(stats.totalD-stats.totalC),c:"var(--gold)"}].map(({l,v,c})=>(
+            <div key={l} className="card" style={{padding:"12px 14px"}}>
+              <div className="dim" style={{fontSize:10,marginBottom:4}}>{l}</div>
+              <div className="mono" style={{color:c,fontWeight:800,fontSize:14}}>{v}</div>
+            </div>
+          ))}
+        </div>
+        {/* Daily breakdown */}
+        <div className="card" style={{padding:16,marginBottom:12}}>
+          <div className="section-label">နေ့တိုင်း မှတ်တမ်း</div>
+          {monthDates.length===0&&<div className="dim" style={{textAlign:"center",padding:16}}>မှတ်တမ်းမရှိ</div>}
+          {monthDates.map(d=>{
+            const ids=dailyIds[d]||[];const sess=sessions[d]||{};
+            const dc=ids.reduce((s,id)=>s+(sess[id]?.collected||0),0);
+            const dd=ids.reduce((s,id)=>s+(sess[id]?.amountDue||profiles[id]?.defaultAmountDue||0),0);
+            const dr=dd>0?Math.round(dc/dd*100):0;
+            return(
+              <div key={d} style={{marginBottom:10,paddingBottom:10,borderBottom:"1px solid var(--border)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                  <span style={{fontSize:13,fontWeight:600}}>{fmtDateShort(d)}</span>
+                  <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                    <span className="mono green-text" style={{fontWeight:700,fontSize:13}}>{fmtMMK(dc)}</span>
+                    <span className="mono" style={{color:dr>=80?"var(--green)":dr>=50?"var(--gold)":"var(--red)",fontSize:11}}>{dr}%</span>
+                  </div>
+                </div>
+                <div className="progress-track" style={{height:4}}>
+                  <div className="progress-fill" style={{width:`${dr}%`,background:`linear-gradient(90deg,var(--green),var(--cyan))`}}/>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {debtors.length>0&&(
+          <div className="card card-red" style={{padding:16}}>
+            <div style={{color:"var(--red)",fontSize:12,fontWeight:700,letterSpacing:1,marginBottom:12,textTransform:"uppercase"}}>⚠️ အကြွေးကျန် ({debtors.length}ဦး)</div>
+            {debtors.slice(0,8).map(d=>(
+              <div key={d.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,paddingBottom:10,borderBottom:"1px solid var(--border)"}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:600,fontSize:13,marginBottom:2}}>{d.profile.name}</div>
+                  <div className="dim" style={{fontSize:11}}>{d.count}ကြိမ် မပေးသေး | {fmtDateShort(d.lastDate)}</div>
+                </div>
+                <div className="mono red-text" style={{fontWeight:800,fontSize:13,flexShrink:0}}>{fmtMMK(d.totalOwed)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── PRE-CALL TRACKER ─────────────────────────────────────────────────────────
+function PreCallTracker({profiles,sessions,dailyIds,date,onBack}){
+  const tomorrow=(()=>{const d=new Date(date+"T00:00:00");d.setDate(d.getDate()+1);return d.toISOString().slice(0,10);})();
+  const[calls,setCalls]=useState(()=>loadLS("ct_precalls_"+tomorrow,{}));
+  const[search,setSearch]=useState("");
+  const saveCalls=v=>{setCalls(v);saveLS("ct_precalls_"+tomorrow,v);};
+  const todaySess=sessions[date]||{};
+  const todayIds=dailyIds[date]||[];
+  const suggested=todayIds.filter(id=>{const s=todaySess[id];return s&&(s.status==="absent"||s.status==="partial");});
+  const allProfiles=Object.values(profiles).filter(p=>{
+    if(!search)return true;
+    const q=search.toLowerCase();
+    return p.name?.toLowerCase().includes(q)||p.policy?.toLowerCase().includes(q);
+  });
+  const CSTATUS={
+    none:{label:"မခေါ်ရသေး",c:"var(--text3)"},
+    yes:{label:"လာပါမည်",c:"var(--green)"},
+    no:{label:"မရဘူး",c:"var(--red)"},
+    later:{label:"နောက်ကျမယ်",c:"var(--gold)"},
+    noans:{label:"မကိုင်",c:"var(--purple)"},
+  };
+  const setStatus=(id,status)=>saveCalls({...calls,[id]:{...calls[id],status,calledAt:new Date().toISOString()}});
+  const setNote=(id,note)=>saveCalls({...calls,[id]:{...calls[id],note}});
+  const tomorrowFmt=new Date(tomorrow+"T00:00:00").toLocaleDateString("my-MM",{month:"short",day:"numeric",weekday:"short"});
+  return(
+    <div className="view-wrap page-slide">
+      <TopBar title="📞 ကြိုတင်ခေါ်ဆိုမှတ်တမ်း" onBack={onBack}/>
+      <div style={{padding:16}} className="pb-nav">
+        <div className="card card-cyan" style={{padding:"12px 16px",marginBottom:14}}>
+          <div className="cyan-text" style={{fontSize:13,fontWeight:700}}>မနက်ဖြန် ({tomorrowFmt}) သွားမည့် customer တွေကို ကြိုဆက်ပါ</div>
+        </div>
+        <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+          {Object.entries(CSTATUS).map(([k,v])=>(
+            <div key={k} className="card" style={{padding:"8px 12px",textAlign:"center",minWidth:60}}>
+              <div style={{color:v.c,fontWeight:800,fontSize:16}}>{Object.values(calls).filter(c=>c.status===k).length}</div>
+              <div style={{color:v.c,fontSize:10,fontWeight:700}}>{v.label}</div>
+            </div>
+          ))}
+        </div>
+        {suggested.length>0&&(
+          <div className="card card-gold" style={{padding:"12px 16px",marginBottom:14}}>
+            <div className="gold-text" style={{fontSize:12,fontWeight:700,marginBottom:4}}>⚠ ဒီနေ့ကျန် {suggested.length}ဦး — ဦးစားပေး ခေါ်ပါ</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{suggested.map(id=><span key={id} className="muted" style={{fontSize:12}}>{profiles[id]?.name}</span>)}</div>
+          </div>
+        )}
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Customer ရှာပါ" className="inp" style={{marginBottom:12}}/>
+        {allProfiles.map((p,i)=>{
+          const c=calls[p.id]||{status:"none"};
+          const sc=CSTATUS[c.status]||CSTATUS.none;
+          return(
+            <div key={p.id} className="card" style={{padding:"12px 14px",marginBottom:10,borderLeft:`3px solid ${sc.c}`,animation:`fadeUp .2s ease both`,animationDelay:`${i*25}ms`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8,gap:8}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:14,marginBottom:1}}>{p.name}</div>
+                  <div className="dim" style={{fontSize:11}}>{p.policy}{p.address?` · ${p.address}`:""}</div>
+                </div>
+                {p.phone&&(
+                  <a href={"tel:"+p.phone.replace(/[^0-9+]/g,"")} className="btn btn-ghost"
+                    style={{padding:"7px 12px",borderColor:"rgba(0,212,255,0.3)",color:"var(--cyan)",fontSize:12,flexShrink:0}}>
+                    📞 ခေါ်
+                  </a>
+                )}
+              </div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:c.status!=="none"?8:0}}>
+                {Object.entries(CSTATUS).filter(([k])=>k!=="none").map(([k,v])=>(
+                  <button key={k} onClick={()=>setStatus(p.id,k)}
+                    className="btn" style={{padding:"5px 10px",borderRadius:99,border:`1px solid ${c.status===k?v.c:v.c+"44"}`,background:c.status===k?v.c+"22":"transparent",color:v.c,fontSize:11,fontWeight:700}}>
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+              {c.status!=="none"&&(
+                <input value={c.note||""} onChange={e=>setNote(p.id,e.target.value)} placeholder="မှတ်ချက်" className="inp" style={{fontSize:12,padding:"8px 12px"}}/>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── DUE DATE TRACKER ─────────────────────────────────────────────────────────
+function DueDateTracker({profiles,onBack,onUpdateProfile}){
+  const[editId,setEditId]=useState(null);
+  const[dateInp,setDateInp]=useState("");
+  const today=getToday();
+  const withDue=Object.values(profiles).filter(p=>p.dueDate).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const noDue=Object.values(profiles).filter(p=>!p.dueDate);
+  const daysLeft=d=>Math.round((new Date(d+"T00:00:00")-new Date(today+"T00:00:00"))/(1000*60*60*24));
+  const urgency=d=>{const dl=daysLeft(d);
+    if(dl<0)return{color:"var(--red)",label:"သက်တမ်းကုန်",cls:"card-red"};
+    if(dl<=7)return{color:"var(--red)",label:`${dl}ရက်သာကျန်`,cls:"card-red"};
+    if(dl<=30)return{color:"var(--gold)",label:`${dl}ရက်ကျန်`,cls:"card-gold"};
+    return{color:"var(--green)",label:`${dl}ရက်ကျန်`,cls:"card-green"};
+  };
+  const saveDate=id=>{onUpdateProfile({...profiles[id],dueDate:dateInp});setEditId(null);};
+  const overdue=withDue.filter(p=>daysLeft(p.dueDate)<0).length;
+  const soon=withDue.filter(p=>{const d=daysLeft(p.dueDate);return d>=0&&d<=30;}).length;
+  return(
+    <div className="view-wrap page-slide">
+      <TopBar title="📆 Due Date Tracker" onBack={onBack}/>
+      <div style={{padding:16}} className="pb-nav">
+        <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+          {overdue>0&&<div className="card card-red" style={{padding:"8px 14px"}}><span className="red-text" style={{fontWeight:700,fontSize:13}}>⚠ {overdue}ဦး သက်တမ်းကုန်</span></div>}
+          {soon>0&&<div className="card card-gold" style={{padding:"8px 14px"}}><span className="gold-text" style={{fontWeight:700,fontSize:13}}>⏰ {soon}ဦး ၃၀ရက်အတွင်း</span></div>}
+          {overdue===0&&soon===0&&<div className="card card-green" style={{padding:"8px 14px"}}><span className="green-text" style={{fontWeight:700,fontSize:13}}>✓ အကုန်ရှင်းသည်</span></div>}
+        </div>
+        {withDue.map((p,i)=>{
+          const u=urgency(p.dueDate);
+          return(
+            <div key={p.id} className={`card ${u.cls}`} style={{padding:"13px 14px",marginBottom:8,animation:`fadeUp .2s ease both`,animationDelay:`${i*30}ms`}}>
+              {editId===p.id?(
+                <div>
+                  <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>{p.name}</div>
+                  <div style={{display:"flex",gap:8}}>
+                    <input type="date" value={dateInp} onChange={e=>setDateInp(e.target.value)} className="inp" style={{flex:1}}/>
+                    <button onClick={()=>saveDate(p.id)} className="btn btn-success" style={{padding:"0 14px"}}>✓</button>
+                    <button onClick={()=>setEditId(null)} className="btn btn-ghost" style={{padding:"0 10px"}}>✕</button>
+                  </div>
+                </div>
+              ):(
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{p.name}</div>
+                    <div className="mono dim" style={{fontSize:11}}>{p.policy}</div>
+                    <div className="dim" style={{fontSize:11,marginTop:2}}>Due: {new Date(p.dueDate+"T00:00:00").toLocaleDateString("my-MM",{year:"numeric",month:"short",day:"numeric"})}</div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <div style={{color:u.color,fontWeight:800,fontSize:12,marginBottom:4}}>{u.label}</div>
+                    <button onClick={()=>{setEditId(p.id);setDateInp(p.dueDate);}} className="btn btn-ghost" style={{padding:"5px 10px",fontSize:12}}>✏️ ပြင်</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {noDue.length>0&&(
+          <div style={{marginTop:16}}>
+            <div className="section-label">Due date မသတ်မှတ်ရသေး ({noDue.length}ဦး)</div>
+            {noDue.map((p,i)=>(
+              <div key={p.id} className="card" style={{padding:"13px 14px",marginBottom:8,animation:`fadeUp .2s ease both`,animationDelay:`${i*30}ms`}}>
+                {editId===p.id?(
+                  <div>
+                    <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>{p.name}</div>
+                    <div style={{display:"flex",gap:8}}>
+                      <input type="date" value={dateInp} onChange={e=>setDateInp(e.target.value)} className="inp" style={{flex:1}}/>
+                      <button onClick={()=>saveDate(p.id)} className="btn btn-success" style={{padding:"0 14px"}}>✓</button>
+                      <button onClick={()=>setEditId(null)} className="btn btn-ghost" style={{padding:"0 10px"}}>✕</button>
+                    </div>
+                  </div>
+                ):(
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{p.name}</div>
+                      <div className="mono dim" style={{fontSize:11}}>{p.policy}</div>
+                    </div>
+                    <button onClick={()=>{setEditId(p.id);setDateInp("");}} className="btn btn-ghost" style={{padding:"7px 14px",fontSize:12}}>+ Due date</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── DATA MANAGER ─────────────────────────────────────────────────────────────
+function DataManager({profiles,sessions,dailyIds,onBack,onImport,onClearAll}){
+  const[tab,setTab]=useState("sessions");
+  const[editSess,setEditSess]=useState(null);
+  const[editSessVal,setEditSessVal]=useState({});
+  const[msg,setMsg]=useState(null);
+  const showMsg=t=>{setMsg(t);setTimeout(()=>setMsg(null),2500);};
+  const exportData=()=>{
+    const data={profiles,sessions,dailyIds,exportedAt:new Date().toISOString()};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");a.href=url;a.download="ct-backup-"+getToday()+".json";
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+    showMsg("✓ Backup ဖိုင် Downloads ထဲ သိမ်းပြီး");
+  };
+  const importData=e=>{
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{const d=JSON.parse(ev.target.result);if(!d.profiles||!d.sessions)throw new Error();onImport(d);showMsg("✓ Data သွင်းပြီး");}
+      catch{showMsg("✗ ဖိုင် မမှန်ကန်ပါ");}
+    };reader.readAsText(file);
+  };
+  const sortedDates=Object.keys(dailyIds).sort().reverse();
+  const startEditSess=(date,custId,s)=>{setEditSess({date,custId});setEditSessVal({collected:s?.collected||0,notes:s?.notes||"",status:s?.status||"pending",amountDue:s?.amountDue||0});};
+  const saveEditSess=()=>{
+    if(!editSess)return;
+    const updated={...sessions,[editSess.date]:{...(sessions[editSess.date]||{}),[editSess.custId]:{...editSessVal,collected:parseInt(editSessVal.collected)||0,amountDue:parseInt(editSessVal.amountDue)||0}}};
+    onImport({profiles,sessions:updated,dailyIds});setEditSess(null);showMsg("✓ Data ပြင်ပြီး");
+  };
+  const delEntry=(date,custId)=>{
+    if(!window.confirm("ဤ record ကို ဖျက်မည်လား?"))return;
+    const newSess={...sessions};if(newSess[date]){const d={...newSess[date]};delete d[custId];newSess[date]=d;}
+    const newDI={...dailyIds,[date]:(dailyIds[date]||[]).filter(i=>i!==custId)};
+    onImport({profiles,sessions:newSess,dailyIds:newDI});showMsg("✓ ဖျက်ပြီး");
+  };
+  return(
+    <div className="view-wrap page-slide">
+      <TopBar title="⚙️ Data Manager" onBack={onBack}/>
+      {msg&&<div style={{background:"rgba(0,229,160,0.1)",borderBottom:"1px solid rgba(0,229,160,0.2)",padding:"10px 16px",textAlign:"center",color:"var(--green)",fontSize:13,fontWeight:700}}>{msg}</div>}
+      {editSess&&(
+        <div className="sheet-overlay">
+          <div className="sheet">
+            <div className="sheet-handle"/>
+            <div style={{padding:"16px 20px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontWeight:800,fontSize:16}}>✏️ Record ပြင်မည်</span>
+              <button onClick={()=>setEditSess(null)} className="btn btn-ghost" style={{padding:"6px 14px",borderRadius:10,fontSize:13}}>ပိတ်</button>
+            </div>
+            <div style={{padding:"0 16px 48px"}}>
+              <div className="dim" style={{fontSize:12,marginBottom:12}}>ရက်: {editSess.date} | {profiles[editSess.custId]?.name}</div>
+              {[{k:"amountDue",l:"ကောက်ရမည့်ပမာဏ",type:"number"},{k:"collected",l:"ကောက်ရရှိသောငွေ",type:"number"},{k:"notes",l:"မှတ်ချက်",type:"text"}].map(({k,l,type})=>(
+                <div key={k} style={{marginBottom:12}}>
+                  <div className="dim" style={{fontSize:12,marginBottom:5,fontWeight:700}}>{l}</div>
+                  <input type={type} value={editSessVal[k]||""} onChange={e=>setEditSessVal(p=>({...p,[k]:e.target.value}))} className="inp"/>
+                </div>
+              ))}
+              <div style={{marginBottom:14}}>
+                <div className="dim" style={{fontSize:12,marginBottom:6,fontWeight:700}}>Status</div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {Object.entries(SC).map(([st,cfg])=>(
+                    <button key={st} onClick={()=>setEditSessVal(p=>({...p,status:st}))}
+                      className={`btn ${editSessVal.status===st?`badge-${st} btn-ghost`:""}`}
+                      style={{padding:"7px 14px",borderRadius:99,border:`1px solid ${editSessVal.status===st?cfg.dot:cfg.dot+"44"}`,background:editSessVal.status===st?`${cfg.dot}22`:"transparent",color:cfg.dot,fontSize:12,fontWeight:700}}>
+                      {cfg.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button onClick={saveEditSess} className="btn btn-primary" style={{width:"100%",padding:13,fontSize:15}}>သိမ်းဆည်း</button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="tab-bar" style={{margin:"0 16px"}}>
+        <button className={`tab-btn ${tab==="sessions"?"active":""}`} onClick={()=>setTab("sessions")}>📋 Sessions</button>
+        <button className={`tab-btn ${tab==="backup"?"active":""}`} onClick={()=>setTab("backup")}>💾 Backup</button>
+      </div>
+      {tab==="sessions"&&(
+        <div style={{padding:"12px 16px"}} className="pb-nav">
+          {sortedDates.length===0&&<div className="dim" style={{textAlign:"center",padding:40}}>Data မရှိသေး</div>}
+          {sortedDates.map(date=>{
+            const ids=dailyIds[date]||[];const sess=sessions[date]||{};
+            const total=ids.reduce((s,id)=>s+(sess[id]?.collected||0),0);
+            return(
+              <div key={date} style={{marginBottom:16}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <span className="cyan-text" style={{fontSize:13,fontWeight:700}}>{fmtDate(date)}</span>
+                  <span className="mono green-text" style={{fontWeight:700}}>{fmtMMK(total)}</span>
+                </div>
+                {ids.map(id=>{
+                  const p=profiles[id];const s=sess[id]||{status:"pending"};
+                  return(
+                    <div key={id} className={`card ${SC[s.status]?.cardCls||""}`} style={{padding:"10px 12px",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:600,fontSize:13}}>{p?.name||id}</div>
+                        <div className="dim" style={{fontSize:11}}>{p?.policy}</div>
+                        {s.notes&&<div className="muted" style={{fontSize:11}}>📝{s.notes}</div>}
+                        <div style={{display:"flex",gap:8,marginTop:2}}>
+                          <span className="mono gold-text" style={{fontSize:11}}>ရမည်:{fmtMMK(s.amountDue)}</span>
+                          <span className="mono green-text" style={{fontSize:11}}>ရရှိ:{fmtMMK(s.collected)}</span>
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:6,flexShrink:0}}>
+                        <button onClick={()=>startEditSess(date,id,s)} className="btn btn-ghost" style={{padding:"7px 10px",fontSize:13}}>✏️</button>
+                        <button onClick={()=>delEntry(date,id)} className="btn btn-danger" style={{padding:"7px 10px",fontSize:13}}>🗑</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {tab==="backup"&&(
+        <div style={{padding:"12px 16px"}} className="pb-nav">
+          <div className="card card-cyan" style={{padding:16,marginBottom:12}}>
+            <div style={{fontWeight:800,fontSize:15,marginBottom:4}}>💾 Data Export</div>
+            <div className="muted" style={{fontSize:13,marginBottom:14}}>Data အားလုံးကို JSON ဖိုင်အနေနဲ့ Downloads ထဲ သိမ်းပေးမည်</div>
+            <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+              <div className="card" style={{padding:"10px 16px",flex:1,textAlign:"center"}}>
+                <div className="dim" style={{fontSize:11}}>Profiles</div>
+                <div className="cyan-text" style={{fontWeight:800,fontSize:20}}>{Object.keys(profiles).length}</div>
+              </div>
+              <div className="card" style={{padding:"10px 16px",flex:1,textAlign:"center"}}>
+                <div className="dim" style={{fontSize:11}}>ရက်စုစုပေါင်း</div>
+                <div className="cyan-text" style={{fontWeight:800,fontSize:20}}>{Object.keys(dailyIds).length}</div>
+              </div>
+            </div>
+            <button onClick={exportData} className="btn btn-primary" style={{width:"100%",padding:13,fontSize:15}}>📥 Backup ဖိုင် Download</button>
+          </div>
+          <div className="card" style={{padding:16,marginBottom:12}}>
+            <div style={{fontWeight:800,fontSize:15,marginBottom:4}}>📤 Data Import</div>
+            <div className="muted" style={{fontSize:13,marginBottom:14}}>Backup ဖိုင် (JSON) ကို ပြန်သွင်းမည်</div>
+            <label className="btn btn-purple" style={{width:"100%",padding:13,fontSize:15,display:"flex",justifyContent:"center",cursor:"pointer"}}>
+              📂 Backup ဖိုင် ရွေးပါ
+              <input type="file" accept=".json" onChange={importData} style={{display:"none"}}/>
+            </label>
+          </div>
+          <div className="card card-red" style={{padding:16}}>
+            <div className="red-text" style={{fontWeight:800,fontSize:15,marginBottom:4}}>🗑 Data အားလုံးဖျက်</div>
+            <div className="muted" style={{fontSize:13,marginBottom:14}}>Profile နဲ့ မှတ်တမ်း အကုန်ဖျက်မည် — ပြန်မရနိုင်</div>
+            <button onClick={()=>{if(window.confirm("Data အားလုံး ဖျက်မည်လား?")){onClearAll();}}} className="btn btn-danger" style={{width:"100%",padding:13,fontSize:15}}>⚠️ အားလုံးဖျက်မည်</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+function App(){
+  const[profiles,_setP]=useState(()=>loadLS("ct_profiles",{}));
+  const[sessions,_setSess]=useState(()=>loadLS("ct_sessions",{}));
+  const[dailyIds,_setDI]=useState(()=>loadLS("ct_daily_ids",{}));
+  const setP=v=>{_setP(v);saveLS("ct_profiles",v);};
+  const setSess=v=>{_setSess(v);saveLS("ct_sessions",v);};
+  const setDI=v=>{_setDI(v);saveLS("ct_daily_ids",v);};
+
+  const[unlocked,setUnlocked]=useState(()=>!loadLS("ct_pin",null));
+  const[tab,setTab]=useState("home");
+  const[view,setView]=useState(null); // sub-views
+  const[selId,setSelId]=useState(null);
+  const[hDate,setHDate]=useState(null);
+  const[showAdd,setShowAdd]=useState(false);
+  const[editProf,setEditProf]=useState(null);
+  const[banner,setBanner]=useState(null);
+  const[search,setSearch]=useState("");
+  const[showReceipt,setShowReceipt]=useState(null);
+
+  const today=getToday();
+
+  useEffect(()=>{
+    const di=loadLS("ct_daily_ids",{});
+    if(di[today]!==undefined)return;
+    const prev=getPrev(today);const prevIds=di[prev]||[];
+    const allSess=loadLS("ct_sessions",{});const prevSess=allSess[prev]||{};
+    const carries=[];
+    for(const id of prevIds){const s=prevSess[id];if(!s)continue;
+      if(s.status==="absent")carries.push({id,amountDue:s.amountDue||0});
+      else if(s.status==="partial"){const rem=(s.amountDue||0)-(s.collected||0);if(rem>0)carries.push({id,amountDue:rem});}
+    }
+    const newDI={...di,[today]:carries.map(c=>c.id)};
+    const todaySess={};for(const c of carries)todaySess[c.id]={status:"pending",collected:0,notes:"",amountDue:c.amountDue};
+    const newSess={...allSess,[today]:todaySess};
+    _setDI(newDI);saveLS("ct_daily_ids",newDI);_setSess(newSess);saveLS("ct_sessions",newSess);
+    if(carries.length>0){setBanner(`↩ မနေ့ကျန် ${carries.length}ဦး အလိုအလျောက်ထည့်ပြီး ✓`);setTimeout(()=>setBanner(null),5000);}
+  },[]);
+
+  const addToToday=({profileId,isNew,profile:newProf,amountDue})=>{
+    if(isNew&&newProf){setP({...profiles,[newProf.id]:newProf});}
+    const newDI={...dailyIds,[today]:[...(dailyIds[today]||[]),profileId]};setDI(newDI);
+    const ts={...((sessions[today])||{}),[profileId]:{status:"pending",collected:0,notes:"",amountDue}};setSess({...sessions,[today]:ts});
+  };
+  const saveCol=(cid,data)=>{const ts={...((sessions[today])||{}),[cid]:data};setSess({...sessions,[today]:ts});};
+  const deleteProfile=id=>{
+    if(!window.confirm("ဤ profile ကို ဖျက်မည်လား?"))return;
+    const np={...profiles};delete np[id];setP(np);
+    const ndi={};Object.entries(dailyIds).forEach(([d,ids])=>{ndi[d]=ids.filter(i=>i!==id);});setDI(ndi);
+  };
+  const saveProfile=p=>{setP({...profiles,[p.id]:p});setEditProf(null);};
+  const doImport=d=>{
+    if(d.profiles){_setP(d.profiles);saveLS("ct_profiles",d.profiles);}
+    if(d.sessions){_setSess(d.sessions);saveLS("ct_sessions",d.sessions);}
+    if(d.dailyIds){_setDI(d.dailyIds);saveLS("ct_daily_ids",d.dailyIds);}
+  };
+
+  const todayIds=dailyIds[today]||[];
+  const todaySess=sessions[today]||{};
+  const pendingCount=todayIds.filter(id=>!todaySess[id]||todaySess[id]?.status==="pending").length;
+
+  if(!unlocked)return<PinLock onUnlock={()=>setUnlocked(true)}/>;
+
+  // ── Sub-views (full screen overlays) ──
+  if(view==="detail"&&selId)return(
+    <div>
+      {showReceipt&&<Receipt custId={showReceipt.custId} date={showReceipt.date} profiles={profiles} sessions={sessions} onClose={()=>setShowReceipt(null)}/>}
+      <CollectionDetail custId={selId} profiles={profiles} sessions={sessions} date={today}
+        onBack={()=>{setSelId(null);setView(null);}}
+        onSave={(cid,data)=>{const ts={...((sessions[today])||{}),[cid]:data};setSess({...sessions,[today]:ts});}}
+        onReceipt={custId=>setShowReceipt({custId,date:today})} readOnly={false}/>
+    </div>
+  );
+  if(view==="report")return<ReportView date={today} profiles={profiles} sessions={sessions} dailyIds={dailyIds} onBack={()=>setView(null)}/>;
+  if(view==="history")return<HistoryList sessions={sessions} dailyIds={dailyIds} profiles={profiles} onBack={()=>setView(null)} onSelect={d=>{setHDate(d);setView("histDay");}}/>;
+  if(view==="monthly")return<MonthlyDashboard profiles={profiles} sessions={sessions} dailyIds={dailyIds} onBack={()=>setView(null)}/>;
+  if(view==="precall")return<PreCallTracker profiles={profiles} sessions={sessions} dailyIds={dailyIds} date={today} onBack={()=>setView(null)}/>;
+  if(view==="duedate")return<DueDateTracker profiles={profiles} onBack={()=>setView(null)} onUpdateProfile={p=>setP({...profiles,[p.id]:p})}/>;
+  if(view==="profiles")return(
+    <div>
+      {editProf&&<EditProfileModal profile={editProf} onSave={saveProfile} onClose={()=>setEditProf(null)}/>}
+      <ProfilesList profiles={profiles} sessions={sessions} onBack={()=>setView(null)} onEdit={p=>setEditProf(p)} onDelete={deleteProfile}/>
+    </div>
+  );
+  if(view==="datamanager")return<DataManager profiles={profiles} sessions={sessions} dailyIds={dailyIds} onBack={()=>setView(null)} onImport={doImport} onClearAll={()=>{_setP({});_setSess({});_setDI({});saveLS("ct_profiles",{});saveLS("ct_sessions",{});saveLS("ct_daily_ids",{});}}/>;
+  if(view==="histDay"&&hDate){
+    if(selId)return<CollectionDetail custId={selId} profiles={profiles} sessions={sessions} date={hDate} onBack={()=>setSelId(null)} onSave={()=>{}} readOnly={true}/>;
+    return(
+      <div style={{minHeight:"100vh",background:"var(--bg)",display:"flex",flexDirection:"column"}}>
+        <TopBar title={fmtDate(hDate)} onBack={()=>{setView("history");setSelId(null);}}
+          extra={<button onClick={()=>setView("histReport")} className="btn btn-ghost" style={{padding:"6px 10px",borderRadius:8,fontSize:12}}>📊</button>}/>
+        <DayView date={hDate} profiles={profiles} sessions={sessions} dailyIds={dailyIds} onSelect={id=>setSelId(id)} search=""/>
+      </div>
+    );
+  }
+  if(view==="histReport"&&hDate)return<ReportView date={hDate} profiles={profiles} sessions={sessions} dailyIds={dailyIds} onBack={()=>setView("histDay")}/>;
+
+  // ── HOME TAB ──
+  const homeContent=(
+    <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
+      {showReceipt&&<Receipt custId={showReceipt.custId} date={showReceipt.date} profiles={profiles} sessions={sessions} onClose={()=>setShowReceipt(null)}/>}
+      {showAdd&&<AddTodayModal profiles={profiles} dailyIds={dailyIds} date={today} onAdd={addToToday} onClose={()=>setShowAdd(false)}/>}
+      {editProf&&<EditProfileModal profile={editProf} onSave={saveProfile} onClose={()=>setEditProf(null)}/>}
+
+      {/* Header */}
+      <div style={{padding:"14px 16px 0",background:"transparent"}}>
+        {banner&&(
+          <div style={{background:"rgba(0,229,160,0.08)",border:"1px solid rgba(0,229,160,0.2)",borderRadius:12,padding:"9px 14px",marginBottom:10,color:"var(--green)",fontSize:12,fontWeight:700,animation:"fadeUp .3s ease both",textAlign:"center"}}>
+            {banner}
+          </div>
+        )}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div>
+            <div style={{fontWeight:900,fontSize:20}} className="gradient-text">Capital Taiyo</div>
+            <div className="dim" style={{fontSize:11,marginTop:1}}>{fmtDate(today)}</div>
+          </div>
+          <button onClick={()=>setUnlocked(false)} className="btn btn-danger" style={{padding:"8px 12px",borderRadius:10,fontSize:13}}>🔒</button>
+        </div>
+
+        {/* Stats row */}
+        {todayIds.length>0&&(()=>{
+          const totalC=todayIds.reduce((s,id)=>s+(todaySess[id]?.collected||0),0);
+          const totalD=todayIds.reduce((s,id)=>s+(todaySess[id]?.amountDue||profiles[id]?.defaultAmountDue||0),0);
+          const done=todayIds.filter(id=>["collected","absent","partial"].includes(todaySess[id]?.status)).length;
+          return(
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}} className="stagger-1">
+              <div className="stat-card" style={{background:"rgba(0,229,160,0.06)",borderColor:"rgba(0,229,160,0.2)"}}>
+                <div className="dim" style={{fontSize:9,marginBottom:3,fontWeight:700,letterSpacing:.5}}>ကောက်ရပြီး</div>
+                <div className="mono green-text" style={{fontWeight:800,fontSize:11}}>{fmtMMK(totalC)}</div>
+              </div>
+              <div className="stat-card" style={{background:"rgba(176,106,255,0.06)",borderColor:"rgba(176,106,255,0.2)"}}>
+                <div className="dim" style={{fontSize:9,marginBottom:3,fontWeight:700,letterSpacing:.5}}>ကျန်ကောက်ရန်</div>
+                <div className="mono" style={{fontWeight:800,fontSize:11,color:"var(--purple)"}}>{fmtMMK(totalD-totalC)}</div>
+              </div>
+              <div className="stat-card" style={{background:"rgba(245,166,35,0.06)",borderColor:"rgba(245,166,35,0.2)"}}>
+                <div className="dim" style={{fontSize:9,marginBottom:3,fontWeight:700,letterSpacing:.5}}>ပြီးမြောက်</div>
+                <div className="mono gold-text" style={{fontWeight:800,fontSize:11}}>{done}/{todayIds.length}</div>
+              </div>
+            </div>
+          );
+        })()}
+
+        <DailyTargetBar sessions={sessions} dailyIds={dailyIds} date={today}/>
+
+        {todayIds.length>0&&(
+          <div style={{position:"relative",marginBottom:8}}>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 အမည် / Policy / လိပ်စာ ရှာပါ" className="inp" style={{paddingRight:40}}/>
+            {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"var(--text3)",cursor:"pointer",fontSize:16}}>✕</button>}
+          </div>
+        )}
+
+        {pendingCount>0&&(
+          <div style={{background:"rgba(245,166,35,0.07)",border:"1px solid rgba(245,166,35,0.2)",borderRadius:10,padding:"8px 14px",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span className="gold-text" style={{fontSize:12,fontWeight:700}}>⏳ {pendingCount}ဦး မသွားရသေး</span>
+            <button onClick={()=>setView("precall")} className="btn btn-gold" style={{padding:"5px 12px",fontSize:11,borderRadius:8}}>📞 ကြိုဆက်</button>
+          </div>
+        )}
+      </div>
+
+      <div className="view-wrap" style={{flex:1,height:"auto"}}>
+        <DayView date={today} profiles={profiles} sessions={sessions} dailyIds={dailyIds}
+          onSelect={id=>{setSelId(id);setView("detail");}} search={search}/>
+        <div style={{height:80}}/>
+      </div>
+
+      <button onClick={()=>setShowAdd(true)}
+        style={{position:"fixed",bottom:70,right:20,width:52,height:52,borderRadius:99,
+          background:"linear-gradient(135deg,var(--cyan),var(--cyan2))",
+          border:"none",color:"#050a14",fontSize:24,cursor:"pointer",
+          boxShadow:"0 4px 24px rgba(0,212,255,0.4),0 0 0 4px rgba(0,212,255,0.1)",
+          display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,zIndex:50,
+          animation:"glow 2s ease-in-out infinite"}}>
+        +
+      </button>
+    </div>
+  );
+
+  // ── MORE TAB ──
+  const moreContent=(
+    <div className="view-wrap page-fade">
+      <div style={{padding:"20px 16px"}} className="pb-nav">
+        <div style={{fontWeight:900,fontSize:20,marginBottom:4}} className="gradient-text">Capital Taiyo</div>
+        <div className="dim" style={{fontSize:12,marginBottom:24}}>Cash Collection App v6</div>
+        {[
+          {icon:"📅",label:"မှတ်တမ်း",sub:"ခဲ့သောရက်တွေ ပြန်ကြည့်",action:()=>setView("history")},
+          {icon:"📊",label:"ဒီနေ့ Report",sub:"Report ကြည့် / Copy",action:()=>setView("report")},
+          {icon:"📆",label:"Due Date Tracker",sub:"Policy သက်တမ်းရက် စီမံ",action:()=>setView("duedate")},
+          {icon:"⚙️",label:"Data Manager",sub:"Data ကြည့် / ပြင် / Backup",action:()=>setView("datamanager")},
+        ].map(({icon,label,sub,action},i)=>(
+          <button key={label} onClick={action} className="card"
+            style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"14px 16px",marginBottom:10,cursor:"pointer",border:"none",textAlign:"left",animation:`fadeUp .25s ease both`,animationDelay:`${i*40}ms`}}>
+            <div style={{width:44,height:44,borderRadius:12,background:"var(--glass2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{icon}</div>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,fontSize:14,marginBottom:1}}>{label}</div>
+              <div className="dim" style={{fontSize:12}}>{sub}</div>
+            </div>
+            <span className="muted" style={{fontSize:18}}>›</span>
+          </button>
+        ))}
+        <button onClick={()=>setUnlocked(false)} className="btn btn-danger" style={{width:"100%",padding:14,marginTop:8,fontSize:14}}>🔒 App Lock လုပ်မည်</button>
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={{height:"100vh",display:"flex",flexDirection:"column",background:"var(--bg)"}}>
+      <div style={{flex:1,overflow:"hidden",position:"relative"}}>
+        {tab==="home"&&homeContent}
+        {tab==="profiles"&&(
+          <div style={{height:"100%",overflow:"hidden"}}>
+            {editProf&&<EditProfileModal profile={editProf} onSave={saveProfile} onClose={()=>setEditProf(null)}/>}
+            <ProfilesList profiles={profiles} sessions={sessions} onBack={null} onEdit={p=>setEditProf(p)} onDelete={deleteProfile}/>
+          </div>
+        )}
+        {tab==="monthly"&&<MonthlyDashboard profiles={profiles} sessions={sessions} dailyIds={dailyIds} onBack={null}/>}
+        {tab==="precall_tab"&&<PreCallTracker profiles={profiles} sessions={sessions} dailyIds={dailyIds} date={today} onBack={null}/>}
+        {tab==="more"&&moreContent}
+      </div>
+
+      {/* Bottom Navigation */}
+      <nav className="bottom-nav">
+        <NavBtn icon="🏠" label="Home" active={tab==="home"} onClick={()=>setTab("home")} badge={pendingCount>0&&tab!=="home"}/>
+        <NavBtn icon="👥" label="Profiles" active={tab==="profiles"} onClick={()=>setTab("profiles")}/>
+        <NavBtn icon="📈" label="Analytics" active={tab==="monthly"} onClick={()=>setTab("monthly")}/>
+        <NavBtn icon="📞" label="ကြိုဆက်" active={tab==="precall_tab"} onClick={()=>setTab("precall_tab")}/>
+        <NavBtn icon="☰" label="More" active={tab==="more"} onClick={()=>setTab("more")}/>
+      </nav>
+
+      <style>{`@keyframes floatDot{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}`}</style>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
