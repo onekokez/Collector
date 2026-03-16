@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#020817"/>
+<title>Capital Taiyo Collector</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#020817;font-family:'Segoe UI',sans-serif;-webkit-tap-highlight-color:transparent;}
+input,textarea,button,select{font-family:inherit;}
+::-webkit-scrollbar{display:none;}
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
+input::placeholder,textarea::placeholder{color:#334155;}
+a{text-decoration:none;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect,useMemo,useRef}=React;
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+const getToday=()=>new Date().toISOString().slice(0,10);
+const getPrev=d=>{const dt=new Date(d);dt.setDate(dt.getDate()-1);return dt.toISOString().slice(0,10);};
+const fmtMMK=n=>(n||0).toLocaleString("en-US")+" Ks";
+const fmtK=n=>n>=1000?(n/1000).toFixed(n%1000===0?0:1)+"K":String(n);
+const fmtDate=s=>new Date(s+"T00:00:00").toLocaleDateString("my-MM",{year:"numeric",month:"long",day:"numeric",weekday:"short"});
+const uid=()=>"c_"+Date.now()+"_"+Math.random().toString(36).slice(2,6);
+function loadLS(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}}
+function saveLS(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+function extractRoad(addr){
+  if(!addr)return"လိပ်စာမသိ";
+  const parts=addr.split(/[,၊]/);
+  for(const p of parts){const t=p.trim();if(t.includes("လမ်း"))return t;}
+  return parts[0]?.trim()||"လိပ်စာမသိ";
+}
+const callPhone=phone=>{
+  const n=phone.replace(/[^0-9+]/g,"");
+  window.location.href="tel:"+n;
+};
+
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const DENOMS=[10000,5000,1000,500,200,100,50];
+const SC={
+  pending:{label:"မသွားရသေး",color:"#94a3b8",bg:"#1e293b"},
+  collected:{label:"ငွေသိမ်းပြီး",color:"#34d399",bg:"#0d2b1e"},
+  absent:{label:"မတွေ့",color:"#f87171",bg:"#2b0d0d"},
+  partial:{label:"တစ်ပိုင်းသိမ်း",color:"#a78bfa",bg:"#1a1030"},
+};
+
+// ─── BASE COMPONENTS ──────────────────────────────────────────────────────────
+function TopBar({title,onBack,extra}){
+  return(
+    <div style={{background:"#0f172a",borderBottom:"1px solid #1e293b",padding:"14px 16px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:50}}>
+      {onBack&&<button onClick={onBack} style={{background:"none",border:"none",color:"#94a3b8",fontSize:22,cursor:"pointer",padding:0,lineHeight:1,minWidth:28}}>←</button>}
+      <span style={{fontWeight:700,fontSize:15,color:"#f1f5f9",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{title}</span>
+      {extra}
+    </div>
+  );
+}
+function Badge({status}){
+  const c=SC[status]||SC.pending;
+  return<span style={{fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:99,background:c.bg,color:c.color,border:`1px solid ${c.color}33`,whiteSpace:"nowrap"}}>{c.label}</span>;
+}
+function IRow({label,value,accent}){
+  return(
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8,gap:8}}>
+      <span style={{color:"#64748b",fontSize:13,flexShrink:0}}>{label}</span>
+      <span style={{color:accent?"#38bdf8":"#f1f5f9",fontSize:13,fontWeight:accent?700:400,fontFamily:accent?"monospace":"inherit",textAlign:"right"}}>{value}</span>
+    </div>
+  );
+}
+function Btn({label,onClick,color="#38bdf8",bg,border,disabled,style={}}){
+  return(
+    <button onClick={onClick} disabled={disabled}
+      style={{padding:"12px 16px",background:bg||(disabled?"#1e293b":`${color}22`),border:`1px solid ${border||(disabled?"#334155":`${color}66`)}`,borderRadius:12,color:disabled?"#475569":color,fontWeight:700,cursor:disabled?"default":"pointer",fontSize:14,...style}}>
+      {label}
+    </button>
+  );
+}
+
+// ─── MONEY COUNTER ────────────────────────────────────────────────────────────
+function MoneyCounter({onConfirm,onClose}){
+  const[counts,setCounts]=useState(()=>Object.fromEntries(DENOMS.map(d=>[d,0])));
+  const total=useMemo(()=>DENOMS.reduce((s,d)=>s+d*counts[d],0),[counts]);
+  const adj=(d,delta)=>setCounts(p=>({...p,[d]:Math.max(0,p[d]+delta)}));
+  return(
+    <div style={{position:"fixed",inset:0,background:"#000a",zIndex:200,display:"flex",alignItems:"flex-end"}}>
+      <div style={{background:"#0f172a",width:"100%",borderRadius:"20px 20px 0 0",padding:20,maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <span style={{color:"#f1f5f9",fontWeight:700,fontSize:17}}>🧮 ငွေရေတွက်</span>
+          <button onClick={onClose} style={{background:"#1e293b",border:"none",color:"#94a3b8",borderRadius:8,padding:"6px 12px",cursor:"pointer"}}>ပိတ်</button>
+        </div>
+        {DENOMS.map(d=>(
+          <div key={d} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,background:"#1e293b",borderRadius:10,padding:"10px 14px"}}>
+            <span style={{color:"#fbbf24",fontWeight:700,fontSize:15,width:52}}>{fmtK(d)}</span>
+            <span style={{color:"#64748b",fontSize:12,flex:1}}>×{counts[d]}={fmtMMK(d*counts[d])}</span>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <button onClick={()=>adj(d,-1)} style={{width:36,height:36,borderRadius:8,background:"#0f172a",border:"1px solid #334155",color:"#f1f5f9",fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+              <span style={{color:"#f1f5f9",fontWeight:700,minWidth:28,textAlign:"center",fontSize:16}}>{counts[d]}</span>
+              <button onClick={()=>adj(d,1)} style={{width:36,height:36,borderRadius:8,background:"#0f172a",border:"1px solid #334155",color:"#f1f5f9",fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+            </div>
+          </div>
+        ))}
+        <div style={{background:"#0d2b1e",border:"1px solid #34d39966",borderRadius:12,padding:"14px 16px",margin:"16px 0",textAlign:"center"}}>
+          <div style={{color:"#94a3b8",fontSize:12,marginBottom:4}}>စုစုပေါင်းငွေ</div>
+          <div style={{color:"#34d399",fontSize:26,fontWeight:800}}>{fmtMMK(total)}</div>
+        </div>
+        <button onClick={()=>onConfirm(total)} style={{width:"100%",padding:14,background:"#34d399",border:"none",borderRadius:12,color:"#0d2b1e",fontWeight:800,fontSize:16,cursor:"pointer"}}>
+          ✓ အတည်ပြု ({fmtMMK(total)})
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── ADD TO TODAY MODAL (pick from profiles OR new) ───────────────────────────
+function AddTodayModal({profiles,dailyIds,date,onAdd,onClose}){
+  const[tab,setTab]=useState("pick");
+  const[search,setSearch]=useState("");
+  const[form,setForm]=useState({name:"",policy:"",phone:"",address:"",amountDue:""});
+  const[selId,setSelId]=useState(null);
+  const[customAmt,setCustomAmt]=useState("");
+
+  const existingIds=dailyIds[date]||[];
+  const filtered=Object.values(profiles).filter(p=>{
+    if(existingIds.includes(p.id))return false;
+    const q=search.toLowerCase();
+    return!q||p.name?.toLowerCase().includes(q)||p.policy?.toLowerCase().includes(q);
+  });
+
+  const setF=(k,v)=>setForm(p=>({...p,[k]:v}));
+  const validNew=form.name&&form.policy&&form.amountDue;
+
+  const handlePick=()=>{
+    if(!selId)return;
+    const p=profiles[selId];
+    const amt=customAmt?parseInt(customAmt):p.defaultAmountDue||0;
+    onAdd({profileId:selId,amountDue:amt});
+    onClose();
+  };
+  const handleNew=()=>{
+    if(!validNew)return;
+    const id=uid();
+    onAdd({isNew:true,profile:{id,name:form.name,policy:form.policy,phone:form.phone,address:form.address,defaultAmountDue:parseInt(form.amountDue)||0},amountDue:parseInt(form.amountDue)||0,profileId:id});
+    onClose();
+  };
+
+  const TabBtn=({id,label})=>(
+    <button onClick={()=>setTab(id)} style={{flex:1,padding:"10px 0",background:tab===id?"#38bdf8":"transparent",border:"none",borderBottom:tab===id?"none":"1px solid #1e293b",color:tab===id?"#020817":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13}}>
+      {label}
+    </button>
+  );
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"#000c",zIndex:100,display:"flex",alignItems:"flex-end"}}>
+      <div style={{background:"#0f172a",width:"100%",borderRadius:"20px 20px 0 0",maxHeight:"92vh",display:"flex",flexDirection:"column"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 20px 12px"}}>
+          <span style={{color:"#f1f5f9",fontWeight:700,fontSize:17}}>➕ ဒီနေ့ list ထည့်</span>
+          <button onClick={onClose} style={{background:"#1e293b",border:"none",color:"#94a3b8",borderRadius:8,padding:"6px 12px",cursor:"pointer"}}>ပိတ်</button>
+        </div>
+        <div style={{display:"flex",borderBottom:"1px solid #1e293b"}}>
+          <TabBtn id="pick" label="📋 Profile ရွေး"/>
+          <TabBtn id="new" label="➕ အသစ်ထည့်"/>
+        </div>
+        <div style={{overflowY:"auto",flex:1,padding:16}}>
+          {tab==="pick"?(
+            <>
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 အမည် / Policy ရှာပါ"
+                style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"11px 14px",color:"#f1f5f9",fontSize:14,outline:"none",marginBottom:12}}/>
+              {filtered.length===0&&<div style={{color:"#475569",textAlign:"center",padding:20}}>Profile မတွေ့ပါ</div>}
+              {filtered.map(p=>(
+                <div key={p.id} onClick={()=>setSelId(selId===p.id?null:p.id)}
+                  style={{background:selId===p.id?"#0d2b1e":"#1e293b",border:`1px solid ${selId===p.id?"#34d399":"#334155"}`,borderRadius:10,padding:"12px 14px",marginBottom:8,cursor:"pointer"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div>
+                      <div style={{color:"#f1f5f9",fontWeight:700,fontSize:14}}>{p.name}</div>
+                      <div style={{color:"#475569",fontSize:12,marginTop:2}}>{p.policy}{p.phone?` • ${p.phone}`:""}</div>
+                      {p.address&&<div style={{color:"#334155",fontSize:11,marginTop:1}}>{p.address}</div>}
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{color:"#fbbf24",fontWeight:700,fontSize:13}}>{fmtMMK(p.defaultAmountDue)}</div>
+                      {selId===p.id&&<span style={{color:"#34d399",fontSize:18}}>✓</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {selId&&(
+                <div style={{marginTop:12}}>
+                  <div style={{color:"#64748b",fontSize:12,marginBottom:6}}>ဒီနေ့ ကောက်ရမည့်ပမာဏ (မပြောင်းရင် ထားခဲ့)</div>
+                  <input type="number" value={customAmt} onChange={e=>setCustomAmt(e.target.value)} placeholder={`Default: ${fmtMMK(profiles[selId]?.defaultAmountDue)}`}
+                    style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"11px 14px",color:"#f1f5f9",fontSize:15,outline:"none"}}/>
+                </div>
+              )}
+              {selId&&(
+                <button onClick={handlePick} style={{width:"100%",marginTop:12,padding:14,background:"#34d399",border:"none",borderRadius:12,color:"#0d2b1e",fontWeight:800,fontSize:15,cursor:"pointer"}}>
+                  ✓ List ထဲ ထည့်မည်
+                </button>
+              )}
+            </>
+          ):(
+            <>
+              {[{k:"name",l:"အမည် *",ph:"ဦးအောင်ကြည်"},{k:"policy",l:"Policy *",ph:"CT-2024-001"},{k:"phone",l:"ဖုန်းနံပါတ်",ph:"09-XXXX-XXXXX"}].map(({k,l,ph})=>(
+                <div key={k} style={{marginBottom:12}}>
+                  <div style={{color:"#64748b",fontSize:12,marginBottom:5}}>{l}</div>
+                  <input type="text" value={form[k]} onChange={e=>setF(k,e.target.value)} placeholder={ph}
+                    style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"11px 14px",color:"#f1f5f9",fontSize:15,outline:"none"}}/>
+                </div>
+              ))}
+              <div style={{marginBottom:12}}>
+                <div style={{color:"#64748b",fontSize:12,marginBottom:5}}>လိပ်စာ</div>
+                <textarea value={form.address} onChange={e=>setF("address",e.target.value)} placeholder="အမှတ်၃၆၀၊ နွယ်သာကီလမ်း၊ ဆရပ်ကွက်" rows={2}
+                  style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"11px 14px",color:"#f1f5f9",fontSize:14,outline:"none",resize:"none"}}/>
+                <div style={{color:"#475569",fontSize:11,marginTop:3}}>💡 လမ်းအမည်ပါမှ auto-group ဖြစ်မည်</div>
+              </div>
+              <div style={{marginBottom:16}}>
+                <div style={{color:"#64748b",fontSize:12,marginBottom:5}}>ကောက်ခံရမည့် ပမာဏ *</div>
+                <input type="number" value={form.amountDue} onChange={e=>setF("amountDue",e.target.value)} placeholder="15000"
+                  style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"11px 14px",color:"#f1f5f9",fontSize:15,outline:"none"}}/>
+              </div>
+              <button onClick={handleNew} disabled={!validNew}
+                style={{width:"100%",padding:14,background:validNew?"#38bdf8":"#1e293b",border:"none",borderRadius:12,color:validNew?"#0a0a1a":"#475569",fontWeight:800,fontSize:15,cursor:validNew?"pointer":"default"}}>
+                Profile ဖန်တီး + List ထဲထည့်
+              </button>
+            </>
+          )}
+          <div style={{height:20}}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── COLLECTION DETAIL ────────────────────────────────────────────────────────
+function CollectionDetail({custId,profiles,sessions,date,onBack,onSave,onReceipt,readOnly}){
+  const p=profiles[custId];
+  const sess=(sessions[date]||{})[custId]||{status:"pending",collected:0,notes:"",amountDue:p?.defaultAmountDue||0};
+  const amtDue=sess.amountDue||p?.defaultAmountDue||0;
+  const[showCtr,setShowCtr]=useState(false);
+  const[inp,setInp]=useState(sess.collected>0?String(sess.collected):"");
+  const[notes,setNotes]=useState(sess.notes||"");
+  const collected=parseInt(inp)||0;
+
+  // note history from past sessions
+  const noteHistory=useMemo(()=>{
+    const hist=[];
+    Object.entries(sessions).forEach(([d,ds])=>{
+      if(d===date)return;
+      const s=ds[custId];
+      if(s?.notes)hist.push({date:d,notes:s.notes,status:s.status,collected:s.collected||0});
+    });
+    return hist.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
+  },[sessions,custId,date]);
+
+  if(!p)return null;
+  const save=status=>{onSave(custId,{status,collected,notes,amountDue:amtDue});onBack();};
+
+  return(
+    <div style={{minHeight:"100vh",background:"#020817"}}>
+      <TopBar title={p.name} onBack={onBack}/>
+      {showCtr&&<MoneyCounter onClose={()=>setShowCtr(false)} onConfirm={t=>{setInp(String(t));setShowCtr(false);}}/>}
+      <div style={{padding:16,display:"flex",flexDirection:"column",gap:14,paddingBottom:40}}>
+
+        {/* Profile Info */}
+        <div style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:14,padding:16}}>
+          <div style={{color:"#64748b",fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>Customer အချက်အလက်</div>
+          <IRow label="Policy" value={p.policy} accent/>
+          {p.address&&(
+            <div style={{marginBottom:8}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                <span style={{color:"#64748b",fontSize:13,flexShrink:0}}>လိပ်စာ</span>
+                <span style={{color:"#f1f5f9",fontSize:13,textAlign:"right"}}>{p.address}</span>
+              </div>
+              <button onClick={()=>openMaps(p.address)}
+                style={{width:"100%",marginTop:6,padding:"8px",background:"#0a1f2e",border:"1px solid #38bdf844",borderRadius:8,color:"#38bdf8",fontWeight:700,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                🗺 Google Maps နဲ့ Navigation ဖွင့်မည်
+              </button>
+            </div>
+          )}
+          <IRow label="ကောက်ခံရမည်" value={<span style={{color:"#fbbf24",fontWeight:700}}>{fmtMMK(amtDue)}</span>}/>
+          <IRow label="Status" value={<Badge status={sess.status}/>}/>
+          {p.phone&&(
+            <div style={{marginTop:10}}>
+              <a href={"tel:"+p.phone.replace(/[^0-9+]/g,"")}
+                style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"11px",background:"#0d2035",border:"1px solid #38bdf866",borderRadius:10,color:"#38bdf8",fontWeight:700,fontSize:14}}>
+                📞 {p.phone} — 3CX နဲ့ ခေါ်မည်
+              </a>
+            </div>
+          )}
+        </div>
+
+        {/* Collection */}
+        {readOnly?(
+          <div style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:14,padding:16}}>
+            <IRow label="သိမ်းခဲ့သောငွေ" value={<span style={{color:"#34d399",fontWeight:700}}>{fmtMMK(sess.collected)}</span>}/>
+            {sess.notes&&<IRow label="မှတ်ချက်" value={sess.notes}/>}
+          </div>
+        ):(
+          <div style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:14,padding:16}}>
+            <div style={{color:"#64748b",fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:12,textTransform:"uppercase"}}>ငွေသိမ်း</div>
+            <div style={{display:"flex",gap:8,marginBottom:12}}>
+              <input type="number" value={inp} onChange={e=>setInp(e.target.value)} placeholder="ရရှိသောငွေ"
+                style={{flex:1,background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"12px 14px",color:"#f1f5f9",fontSize:16,outline:"none"}}/>
+              <button onClick={()=>setShowCtr(true)} style={{padding:"12px 14px",background:"#fbbf2422",border:"1px solid #fbbf2466",borderRadius:10,color:"#fbbf24",fontWeight:700,cursor:"pointer",fontSize:13,whiteSpace:"nowrap"}}>🧮</button>
+            </div>
+            {collected>0&&collected<amtDue&&<div style={{background:"#1a1030",border:"1px solid #a78bfa44",borderRadius:8,padding:"8px 12px",marginBottom:10,color:"#a78bfa",fontSize:13}}>⚠ ကျန်: {fmtMMK(amtDue-collected)}</div>}
+            {collected>=amtDue&&collected>0&&<div style={{background:"#0d2b1e",border:"1px solid #34d39944",borderRadius:8,padding:"8px 12px",marginBottom:10,color:"#34d399",fontSize:13}}>✓ {collected>amtDue?`${fmtMMK(collected-amtDue)} ပိုရ`:"တိတိကိုက်"}</div>}
+            <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="မှတ်ချက် (ဥပမာ - နောက်လာဆိုတယ်)" rows={2}
+              style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"12px 14px",color:"#f1f5f9",fontSize:14,outline:"none",resize:"none"}}/>
+          </div>
+        )}
+
+        {/* Note History */}
+        {noteHistory.length>0&&(
+          <div style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:14,padding:16}}>
+            <div style={{color:"#64748b",fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:12,textTransform:"uppercase"}}>📝 မှတ်တမ်းဟောင်း</div>
+            {noteHistory.map(h=>(
+              <div key={h.date} style={{marginBottom:10,paddingBottom:10,borderBottom:"1px solid #1e293b"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                  <span style={{color:"#475569",fontSize:12}}>{fmtDate(h.date)}</span>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <span style={{color:"#34d399",fontSize:12}}>{fmtMMK(h.collected)}</span>
+                    <Badge status={h.status}/>
+                  </div>
+                </div>
+                <div style={{color:"#94a3b8",fontSize:13}}>{h.notes}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        {!readOnly&&(
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <button onClick={()=>save("collected")} style={{padding:14,background:"#34d399",border:"none",borderRadius:12,color:"#0d2b1e",fontWeight:800,fontSize:16,cursor:"pointer"}}>✓ ငွေသိမ်းပြီး သိမ်းဆည်း</button>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>save("partial")} style={{flex:1,padding:12,background:"#1a1030",border:"1px solid #a78bfa66",borderRadius:12,color:"#a78bfa",fontWeight:700,cursor:"pointer",fontSize:14}}>တစ်ပိုင်းသိမ်း</button>
+              <button onClick={()=>save("absent")} style={{flex:1,padding:12,background:"#2b0d0d",border:"1px solid #f8717166",borderRadius:12,color:"#f87171",fontWeight:700,cursor:"pointer",fontSize:14}}>မတွေ့ / မရှိ</button>
+            </div>
+            {onReceipt&&sess.collected>0&&(
+              <button onClick={()=>onReceipt(custId)} style={{width:"100%",padding:12,background:"#fbbf2422",border:"1px solid #fbbf2466",borderRadius:12,color:"#fbbf24",fontWeight:700,cursor:"pointer",fontSize:14}}>
+                🧾 ဖြတ်ပိုင်းကြည့်မည်
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── DAY VIEW ─────────────────────────────────────────────────────────────────
+function DayView({date,profiles,sessions,dailyIds,onSelect,search}){
+  const ids=dailyIds[date]||[];
+  const sess=sessions[date]||{};
+  const filtered=ids.filter(id=>{
+    const p=profiles[id];if(!p)return false;
+    if(!search)return true;
+    const q=search.toLowerCase();
+    return p.name?.toLowerCase().includes(q)||p.policy?.toLowerCase().includes(q)||p.address?.toLowerCase().includes(q);
+  });
+  const grouped=useMemo(()=>{
+    const g={};
+    for(const id of filtered){
+      const p=profiles[id];if(!p)continue;
+      const road=extractRoad(p.address);
+      if(!g[road])g[road]=[];
+      g[road].push(id);
+    }
+    return g;
+  },[filtered,profiles]);
+
+  const totalC=ids.reduce((s,id)=>s+(sess[id]?.collected||0),0);
+  const totalD=ids.reduce((s,id)=>s+(sess[id]?.amountDue||profiles[id]?.defaultAmountDue||0),0);
+  const done=ids.filter(id=>["collected","absent","partial"].includes(sess[id]?.status)).length;
+  const pending=ids.filter(id=>!sess[id]||sess[id]?.status==="pending").length;
+
+  if(ids.length===0)return(
+    <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:40,gap:12,textAlign:"center"}}>
+      <div style={{fontSize:48,opacity:.2}}>📋</div>
+      <div style={{color:"#334155",fontSize:15}}>+ နှိပ်ပြီး ဒီနေ့ customer ထည့်ပါ</div>
+    </div>
+  );
+
+  return(
+    <div style={{flex:1}}>
+      <div style={{padding:"10px 16px 0"}}>
+        {pending>0&&(
+          <div style={{background:"#292110",border:"1px solid #fbbf2444",borderRadius:10,padding:"10px 14px",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{color:"#fbbf24",fontSize:13,fontWeight:700}}>⏳ မသွားရသေး {pending} ဦးကျန်</span>
+            <span style={{color:"#64748b",fontSize:12}}>ပြီး {done}/{ids.length}</span>
+          </div>
+        )}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
+          <div style={{background:"#0f172a",border:"1px solid #64748b22",borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
+            <div style={{color:"#64748b",fontSize:10,marginBottom:2}}>ကောက်ရမည်</div>
+            <div style={{color:"#64748b",fontWeight:800,fontSize:12}}>{fmtMMK(totalD)}</div>
+          </div>
+          <div style={{background:"#0d2b1e",border:"1px solid #34d39922",borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
+            <div style={{color:"#64748b",fontSize:10,marginBottom:2}}>ကောက်ရရှိ</div>
+            <div style={{color:"#34d399",fontWeight:800,fontSize:12}}>{fmtMMK(totalC)}</div>
+          </div>
+          <div style={{background:"#292110",border:"1px solid #fbbf2422",borderRadius:10,padding:"10px 8px",textAlign:"center"}}>
+            <div style={{color:"#64748b",fontSize:10,marginBottom:2}}>ပြီးမြောက်</div>
+            <div style={{color:"#fbbf24",fontWeight:800,fontSize:12}}>{done}/{ids.length}</div>
+          </div>
+        </div>
+      </div>
+      <div style={{padding:"0 16px 100px"}}>
+        {Object.entries(grouped).map(([road,rids])=>(
+          <div key={road} style={{marginBottom:18}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+              <div style={{height:1,flex:1,background:"#1e293b"}}/>
+              <span style={{color:"#38bdf8",fontSize:11,fontWeight:700,background:"#0f172a",padding:"4px 10px",borderRadius:99,border:"1px solid #38bdf833",whiteSpace:"nowrap"}}>📍 {road}</span>
+              <div style={{height:1,flex:1,background:"#1e293b"}}/>
+            </div>
+            {rids.map((id,i)=>{
+              const p=profiles[id];
+              const s=sess[id]||{status:"pending"};
+              const amt=s.amountDue||p?.defaultAmountDue||0;
+              const sc=SC[s.status]||SC.pending;
+              return(
+                <div key={id} style={{background:"#0f172a",border:`1px solid ${sc.color}33`,borderLeft:`3px solid ${sc.color}`,borderRadius:12,padding:"12px 14px",marginBottom:8,cursor:"pointer",animation:`fadeUp 0.2s ease both`,animationDelay:`${i*20}ms`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}} onClick={()=>onSelect(id)}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3,flexWrap:"wrap"}}>
+                        <span style={{color:"#f1f5f9",fontWeight:700,fontSize:14}}>{p?.name}</span>
+                        <Badge status={s.status}/>
+                      </div>
+                      <div style={{color:"#475569",fontSize:11,marginBottom:1}}>📋 {p?.policy}</div>
+                      {p?.address&&<div style={{color:"#334155",fontSize:11}}>{p.address}</div>}
+                      {s.notes&&<div style={{color:"#64748b",fontSize:11,marginTop:2}}>📝 {s.notes.slice(0,35)}{s.notes.length>35?"…":""}</div>}
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{color:"#fbbf24",fontWeight:800,fontSize:14}}>{fmtMMK(amt)}</div>
+                      {s.collected>0&&<div style={{color:"#34d399",fontSize:11,marginTop:1}}>✓{fmtMMK(s.collected)}</div>}
+                      <span style={{color:"#334155",fontSize:16}}>›</span>
+                    </div>
+                  </div>
+                  {p?.phone&&(
+                    <a href={"tel:"+p.phone.replace(/[^0-9+]/g,"")}
+                      onClick={e=>e.stopPropagation()}
+                      style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginTop:8,padding:"8px",background:"#0d2035",border:"1px solid #38bdf844",borderRadius:8,color:"#38bdf8",fontWeight:700,fontSize:12}}>
+                      📞 {p.phone}
+                    </a>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+        {filtered.length===0&&ids.length>0&&<div style={{textAlign:"center",color:"#475569",padding:30}}>ရှာဖွေမှု ကိုက်ညီသူ မရှိ</div>}
+      </div>
+    </div>
+  );
+}
+
+// ─── PROFILES LIST ────────────────────────────────────────────────────────────
+function ProfilesList({profiles,sessions,onBack,onEdit,onDelete}){
+  const[search,setSearch]=useState("");
+  const list=Object.values(profiles).filter(p=>{
+    const q=search.toLowerCase();
+    return!q||p.name?.toLowerCase().includes(q)||p.policy?.toLowerCase().includes(q);
+  });
+  const lastSeen=id=>{
+    const dates=Object.keys(sessions).sort().reverse();
+    for(const d of dates){if(sessions[d][id])return d;}
+    return null;
+  };
+  return(
+    <div style={{minHeight:"100vh",background:"#020817"}}>
+      <TopBar title="👥 Customer Profiles" onBack={onBack}/>
+      <div style={{padding:"12px 16px"}}>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 အမည် / Policy ရှာပါ"
+          style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"11px 14px",color:"#f1f5f9",fontSize:14,outline:"none",marginBottom:12}}/>
+        <div style={{color:"#475569",fontSize:12,marginBottom:10}}>စုစုပေါင်း {list.length} ဦး</div>
+        {list.map(p=>{
+          const ls=lastSeen(p.id);
+          return(
+            <div key={p.id} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:12,padding:"13px 14px",marginBottom:8}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:6}}>
+                <div style={{flex:1}}>
+                  <div style={{color:"#f1f5f9",fontWeight:700,fontSize:14,marginBottom:2}}>{p.name}</div>
+                  <div style={{color:"#475569",fontSize:12}}>{p.policy}</div>
+                  {p.address&&<div style={{color:"#334155",fontSize:11,marginTop:1}}>{p.address}</div>}
+                  {ls&&<div style={{color:"#475569",fontSize:11,marginTop:2}}>နောက်ဆုံး: {fmtDate(ls)}</div>}
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{color:"#fbbf24",fontWeight:700,fontSize:13}}>{fmtMMK(p.defaultAmountDue)}</div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {p.phone&&(
+                  <a href={"tel:"+p.phone.replace(/[^0-9+]/g,"")}
+                    style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"8px",background:"#0d2035",border:"1px solid #38bdf844",borderRadius:8,color:"#38bdf8",fontWeight:700,fontSize:12}}>
+                    📞 {p.phone}
+                  </a>
+                )}
+                {p.address&&(
+                  <button onClick={()=>openMaps(p.address)} style={{padding:"8px 12px",background:"#0a1f2e",border:"1px solid #38bdf833",borderRadius:8,color:"#38bdf8",fontWeight:700,cursor:"pointer",fontSize:12}}>🗺</button>
+                )}
+                <button onClick={()=>onEdit(p)} style={{padding:"8px 14px",background:"#1e293b",border:"1px solid #334155",borderRadius:8,color:"#94a3b8",fontWeight:700,cursor:"pointer",fontSize:12}}>✏️ ပြင်</button>
+                <button onClick={()=>onDelete(p.id)} style={{padding:"8px 12px",background:"#2b0d0d",border:"1px solid #f8717144",borderRadius:8,color:"#f87171",fontWeight:700,cursor:"pointer",fontSize:12}}>🗑</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── EDIT PROFILE MODAL ───────────────────────────────────────────────────────
+function EditProfileModal({profile,onSave,onClose}){
+  const[form,setForm]=useState({name:profile?.name||"",policy:profile?.policy||"",phone:profile?.phone||"",address:profile?.address||"",defaultAmountDue:profile?.defaultAmountDue||""});
+  const setF=(k,v)=>setForm(p=>({...p,[k]:v}));
+  const valid=form.name&&form.policy;
+  return(
+    <div style={{position:"fixed",inset:0,background:"#000c",zIndex:100,display:"flex",alignItems:"flex-end"}}>
+      <div style={{background:"#0f172a",width:"100%",borderRadius:"20px 20px 0 0",padding:20,maxHeight:"92vh",overflowY:"auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+          <span style={{color:"#f1f5f9",fontWeight:700,fontSize:17}}>✏️ Profile ပြင်မည်</span>
+          <button onClick={onClose} style={{background:"#1e293b",border:"none",color:"#94a3b8",borderRadius:8,padding:"6px 12px",cursor:"pointer"}}>ပိတ်</button>
+        </div>
+        {[{k:"name",l:"အမည် *",ph:"ဦးအောင်ကြည်"},{k:"policy",l:"Policy *",ph:"CT-2024-001"},{k:"phone",l:"ဖုန်းနံပါတ်",ph:"09-XXXX-XXXXX"}].map(({k,l,ph})=>(
+          <div key={k} style={{marginBottom:12}}>
+            <div style={{color:"#64748b",fontSize:12,marginBottom:5}}>{l}</div>
+            <input type="text" value={form[k]} onChange={e=>setF(k,e.target.value)} placeholder={ph}
+              style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"11px 14px",color:"#f1f5f9",fontSize:15,outline:"none"}}/>
+          </div>
+        ))}
+        <div style={{marginBottom:12}}>
+          <div style={{color:"#64748b",fontSize:12,marginBottom:5}}>လိပ်စာ</div>
+          <textarea value={form.address} onChange={e=>setF("address",e.target.value)} rows={2}
+            style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"11px 14px",color:"#f1f5f9",fontSize:14,outline:"none",resize:"none"}}/>
+        </div>
+        <div style={{marginBottom:16}}>
+          <div style={{color:"#64748b",fontSize:12,marginBottom:5}}>Default ကောက်ခံပမာဏ</div>
+          <input type="number" value={form.defaultAmountDue} onChange={e=>setF("defaultAmountDue",e.target.value)} placeholder="15000"
+            style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"11px 14px",color:"#f1f5f9",fontSize:15,outline:"none"}}/>
+        </div>
+        <button onClick={()=>onSave({...profile,...form,defaultAmountDue:parseInt(form.defaultAmountDue)||0})} disabled={!valid}
+          style={{width:"100%",padding:14,background:valid?"#38bdf8":"#1e293b",border:"none",borderRadius:12,color:valid?"#0a0a1a":"#475569",fontWeight:800,fontSize:15,cursor:valid?"pointer":"default"}}>
+          သိမ်းဆည်း
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── REPORT VIEW ──────────────────────────────────────────────────────────────
+function ReportView({date,profiles,sessions,dailyIds,onBack}){
+  const ids=dailyIds[date]||[];
+  const sess=sessions[date]||{};
+  const totalC=ids.reduce((s,id)=>s+(sess[id]?.collected||0),0);
+  const totalD=ids.reduce((s,id)=>s+(sess[id]?.amountDue||profiles[id]?.defaultAmountDue||0),0);
+  const stats={collected:0,partial:0,absent:0,pending:0};
+  ids.forEach(id=>{const st=(sess[id]?.status)||"pending";if(stats[st]!==undefined)stats[st]++;});
+  const txt=`=== Capital Taiyo Cash Collection ===\n${fmtDate(date)}\n${"─".repeat(38)}\nCustomer: ${ids.length}ဦး | ✓${stats.collected} | ~${stats.partial} | ✗${stats.absent} | ⏳${stats.pending}\n${"─".repeat(38)}\nကောက်ခံရမည်: ${fmtMMK(totalD)}\nကောက်ခံရရှိ: ${fmtMMK(totalC)}\nကွာဟချက်:   ${fmtMMK(totalD-totalC)}\n${"─".repeat(38)}\n${ids.map(id=>{const p=profiles[id];const s=sess[id]||{};return`${s.status==="collected"?"✓":s.status==="absent"?"✗":"~"} ${p?.name}(${p?.policy}) ${fmtMMK(s.collected||0)}${s.notes?` [${s.notes}]`:""}`}).join("\n")}`;
+  const[cp,setCp]=useState(false);
+  return(
+    <div style={{minHeight:"100vh",background:"#020817"}}>
+      <TopBar title="📊 Report" onBack={onBack}/>
+      <div style={{padding:16,display:"flex",flexDirection:"column",gap:12,paddingBottom:40}}>
+        <div style={{color:"#475569",fontSize:12,textAlign:"center"}}>{fmtDate(date)}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {[{l:"ကောက်ခံရမည်",v:fmtMMK(totalD),c:"#64748b"},{l:"ကောက်ခံရရှိ",v:fmtMMK(totalC),c:"#34d399"},{l:"ကွာဟချက်",v:fmtMMK(totalD-totalC),c:totalD>totalC?"#f87171":"#34d399"},{l:"Customer",v:`${ids.length}ဦး`,c:"#38bdf8"}].map(({l,v,c})=>(
+            <div key={l} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:12,padding:14,textAlign:"center"}}>
+              <div style={{color:"#64748b",fontSize:11,marginBottom:4}}>{l}</div>
+              <div style={{color:c,fontWeight:800,fontSize:14}}>{v}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:14,padding:16}}>
+          {Object.entries(stats).map(([st,n])=>(
+            <div key={st} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <Badge status={st}/><span style={{color:"#f1f5f9",fontWeight:700}}>{n}ဦး</span>
+            </div>
+          ))}
+        </div>
+        <div style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:14,padding:16}}>
+          {ids.map(id=>{const p=profiles[id];const s=sess[id]||{};return(
+            <div key={id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,paddingBottom:10,borderBottom:"1px solid #1e293b"}}>
+              <div style={{flex:1}}>
+                <div style={{color:"#f1f5f9",fontSize:14,fontWeight:600,marginBottom:2}}>{p?.name}</div>
+                <div style={{color:"#475569",fontSize:12}}>{p?.policy}</div>
+                {p?.address&&<div style={{color:"#334155",fontSize:11,marginTop:1}}>{p.address}</div>}
+                {s.notes&&<div style={{color:"#64748b",fontSize:12,marginTop:2}}>📝{s.notes}</div>}
+              </div>
+              <div style={{textAlign:"right",flexShrink:0}}>
+                <div style={{color:s.status==="collected"?"#34d399":s.status==="absent"?"#f87171":"#fbbf24",fontWeight:700,fontSize:14}}>{fmtMMK(s.collected||0)}</div>
+                <Badge status={s.status||"pending"}/>
+              </div>
+            </div>
+          );})}
+        </div>
+        <button onClick={()=>{navigator.clipboard?.writeText(txt);setCp(true);setTimeout(()=>setCp(false),2000);}}
+          style={{width:"100%",padding:14,background:cp?"#0d2b1e":"#1e293b",border:`1px solid ${cp?"#34d399":"#334155"}`,borderRadius:12,color:cp?"#34d399":"#94a3b8",fontWeight:700,cursor:"pointer",fontSize:15}}>
+          {cp?"✓ ကော်ပီကူးပြီး!":"📋 Report ကော်ပီကူး"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── HISTORY LIST ─────────────────────────────────────────────────────────────
+function HistoryList({sessions,dailyIds,profiles,onSelect,onBack}){
+  const today=getToday();
+  const dates=Object.keys(dailyIds).filter(d=>d!==today&&(dailyIds[d]||[]).length>0).sort().reverse();
+  return(
+    <div style={{minHeight:"100vh",background:"#020817"}}>
+      <TopBar title="📅 မှတ်တမ်း" onBack={onBack}/>
+      <div style={{padding:"16px 16px 80px"}}>
+        {dates.length===0&&<div style={{textAlign:"center",color:"#475569",padding:40}}>မှတ်တမ်းမရှိသေး</div>}
+        {dates.map(date=>{
+          const ids=dailyIds[date]||[];
+          const sess=sessions[date]||{};
+          const total=ids.reduce((s,id)=>s+(sess[id]?.collected||0),0);
+          const done=ids.filter(id=>sess[id]?.status==="collected").length;
+          const absent=ids.filter(id=>sess[id]?.status==="absent").length;
+          return(
+            <div key={date} onClick={()=>onSelect(date)}
+              style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:12,padding:"14px 16px",marginBottom:10,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
+              <div>
+                <div style={{color:"#f1f5f9",fontWeight:700,fontSize:14,marginBottom:4}}>{fmtDate(date)}</div>
+                <div style={{display:"flex",gap:10}}>
+                  <span style={{color:"#64748b",fontSize:12}}>👥{ids.length}</span>
+                  <span style={{color:"#34d399",fontSize:12}}>✓{done}</span>
+                  {absent>0&&<span style={{color:"#f87171",fontSize:12}}>✗{absent}</span>}
+                </div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{color:"#34d399",fontWeight:800,fontSize:15}}>{fmtMMK(total)}</div>
+                <span style={{color:"#334155",fontSize:18}}>›</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+function App(){
+  const[profiles,_setP]=useState(()=>loadLS("ct_profiles",{}));
+  const[sessions,_setSess]=useState(()=>loadLS("ct_sessions",{}));
+  const[dailyIds,_setDI]=useState(()=>loadLS("ct_daily_ids",{}));
+  const setP=v=>{_setP(v);saveLS("ct_profiles",v);};
+  const setSess=v=>{_setSess(v);saveLS("ct_sessions",v);};
+  const setDI=v=>{_setDI(v);saveLS("ct_daily_ids",v);};
+
+  const[unlocked,setUnlocked]=useState(()=>!loadLS("ct_pin",null));
+  const[view,setView]=useState("home");
+  const[selId,setSelId]=useState(null);
+  const[hDate,setHDate]=useState(null);
+  const[showAdd,setShowAdd]=useState(false);
+  const[editProf,setEditProf]=useState(null);
+  const[banner,setBanner]=useState(null);
+  const[search,setSearch]=useState("");
+  const[showReceipt,setShowReceipt]=useState(null); // {custId, date}
+
+  const today=getToday();
+
+  useEffect(()=>{
+    const di=loadLS("ct_daily_ids",{});
+    if(di[today]!==undefined)return;
+    const prev=getPrev(today);
+    const prevIds=di[prev]||[];
+    const allSess=loadLS("ct_sessions",{});
+    const prevSess=allSess[prev]||{};
+    const carries=[];
+    for(const id of prevIds){
+      const s=prevSess[id];if(!s)continue;
+      if(s.status==="absent")carries.push({id,amountDue:s.amountDue||0});
+      else if(s.status==="partial"){const rem=(s.amountDue||0)-(s.collected||0);if(rem>0)carries.push({id,amountDue:rem});}
+    }
+    const newDI={...di,[today]:carries.map(c=>c.id)};
+    const todaySess={};
+    for(const c of carries)todaySess[c.id]={status:"pending",collected:0,notes:"",amountDue:c.amountDue};
+    const newSess={...allSess,[today]:todaySess};
+    _setDI(newDI);saveLS("ct_daily_ids",newDI);
+    _setSess(newSess);saveLS("ct_sessions",newSess);
+    if(carries.length>0){setBanner(`↩ မနေ့ကျန် ${carries.length}ဦး အလိုအလျောက်ထည့်ပြီး ✓`);setTimeout(()=>setBanner(null),5000);}
+  },[]);
+
+  const addToToday=({profileId,isNew,profile:newProf,amountDue})=>{
+    let newProfiles=profiles;
+    if(isNew&&newProf){newProfiles={...profiles,[newProf.id]:newProf};setP(newProfiles);}
+    const newDI={...dailyIds,[today]:[...(dailyIds[today]||[]),profileId]};
+    setDI(newDI);
+    const ts={...((sessions[today])||{}),[profileId]:{status:"pending",collected:0,notes:"",amountDue}};
+    setSess({...sessions,[today]:ts});
+  };
+
+  const saveCol=(cid,data)=>{
+    const ts={...((sessions[today])||{}),[cid]:data};
+    setSess({...sessions,[today]:ts});
+  };
+
+  const deleteProfile=id=>{
+    if(!window.confirm("ဤ profile ကို ဖျက်မည်လား?"))return;
+    const np={...profiles};delete np[id];setP(np);
+    const ndi={};
+    Object.entries(dailyIds).forEach(([d,ids])=>{ndi[d]=ids.filter(i=>i!==id);});
+    setDI(ndi);
+  };
+
+  const saveProfile=p=>{setP({...profiles,[p.id]:p});setEditProf(null);};
+
+  // ── ROUTING ──
+  if(view==="detail"&&selId)return<CollectionDetail custId={selId} profiles={profiles} sessions={sessions} date={today} onBack={()=>{setSelId(null);setView("home");}} onSave={saveCol} readOnly={false}/>;
+  if(!unlocked)return<PinLock onUnlock={()=>setUnlocked(true)}/>;
+  if(view==="report")return<ReportView date={today} profiles={profiles} sessions={sessions} dailyIds={dailyIds} onBack={()=>setView("home")}/>;
+  if(view==="history")return<HistoryList sessions={sessions} dailyIds={dailyIds} profiles={profiles} onBack={()=>setView("home")} onSelect={d=>{setHDate(d);setView("histDay");}}/>;
+  if(view==="monthly")return<MonthlyDashboard profiles={profiles} sessions={sessions} dailyIds={dailyIds} onBack={()=>setView("home")}/>;
+  if(view==="precall")return<PreCallTracker profiles={profiles} sessions={sessions} dailyIds={dailyIds} date={today} onBack={()=>setView("home")}/>;
+  if(view==="duedate")return<DueDateTracker profiles={profiles} onBack={()=>setView("home")} onUpdateProfile={p=>{setP({...profiles,[p.id]:p});}}/>;
+  if(view==="profiles")return(
+    <div>
+      {editProf&&<EditProfileModal profile={editProf} onSave={saveProfile} onClose={()=>setEditProf(null)}/>}
+      <ProfilesList profiles={profiles} sessions={sessions} onBack={()=>setView("home")} onEdit={p=>setEditProf(p)} onDelete={deleteProfile}/>
+    </div>
+  );
+  if(view==="datamanager")return(
+    <DataManager
+      profiles={profiles} sessions={sessions} dailyIds={dailyIds}
+      onBack={()=>setView("home")}
+      onImport={d=>{
+        if(d.profiles){_setP(d.profiles);saveLS("ct_profiles",d.profiles);}
+        if(d.sessions){_setSess(d.sessions);saveLS("ct_sessions",d.sessions);}
+        if(d.dailyIds){_setDI(d.dailyIds);saveLS("ct_daily_ids",d.dailyIds);}
+      }}
+      onClearAll={()=>{
+        _setP({});_setSess({});_setDI({});
+        saveLS("ct_profiles",{});saveLS("ct_sessions",{});saveLS("ct_daily_ids",{});
+      }}
+    />
+  );
+  if(view==="histDay"&&hDate){
+    if(selId)return<CollectionDetail custId={selId} profiles={profiles} sessions={sessions} date={hDate} onBack={()=>setSelId(null)} onSave={()=>{}} readOnly={true}/>;
+    return(
+      <div style={{minHeight:"100vh",background:"#020817",display:"flex",flexDirection:"column"}}>
+        <TopBar title={fmtDate(hDate)} onBack={()=>{setView("history");setSelId(null);}}
+          extra={<button onClick={()=>setView("histReport")} style={{background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontSize:13,fontWeight:700}}>📊</button>}/>
+        <DayView date={hDate} profiles={profiles} sessions={sessions} dailyIds={dailyIds} onSelect={id=>setSelId(id)} search=""/>
+      </div>
+    );
+  }
+  if(view==="histReport"&&hDate)return<ReportView date={hDate} profiles={profiles} sessions={sessions} dailyIds={dailyIds} onBack={()=>setView("histDay")}/>;
+  if(view==="detail"&&selId)return(
+    <div>
+      {showReceipt&&<Receipt custId={showReceipt.custId} date={showReceipt.date} profiles={profiles} sessions={sessions} onClose={()=>setShowReceipt(null)}/>}
+      <CollectionDetail custId={selId} profiles={profiles} sessions={sessions} date={today}
+        onBack={()=>{setSelId(null);setView("home");}}
+        onSave={(cid,data)=>{
+          const ts={...((sessions[today])||{}),[cid]:data};
+          setSess({...sessions,[today]:ts});
+        }}
+        readOnly={false}/>
+    </div>
+  );
+  const todayIds=dailyIds[today]||[];
+  const pending=todayIds.filter(id=>!(sessions[today]||{})[id]||(sessions[today]||{})[id]?.status==="pending").length;
+
+  // ── HOME ──
+  return(
+    <div style={{minHeight:"100vh",background:"#020817",display:"flex",flexDirection:"column"}}>
+      {showReceipt&&<Receipt custId={showReceipt.custId} date={showReceipt.date} profiles={profiles} sessions={sessions} onClose={()=>setShowReceipt(null)}/>}
+      {showAdd&&<AddTodayModal profiles={profiles} dailyIds={dailyIds} date={today} onAdd={addToToday} onClose={()=>setShowAdd(false)}/>}
+      {editProf&&<EditProfileModal profile={editProf} onSave={saveProfile} onClose={()=>setEditProf(null)}/>}
+      {banner&&<div style={{background:"#0d2b1e",borderBottom:"1px solid #34d39944",padding:"10px 16px",textAlign:"center",color:"#34d399",fontSize:13,fontWeight:700}}>{banner}</div>}
+
+      <TopBar title="Capital Taiyo Collector"
+        extra={
+          <div style={{display:"flex",gap:5}}>
+            <button onClick={()=>setView("profiles")} style={{background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",borderRadius:8,padding:"6px 9px",cursor:"pointer",fontSize:12,fontWeight:700}}>👥</button>
+            <button onClick={()=>setView("monthly")} style={{background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",borderRadius:8,padding:"6px 9px",cursor:"pointer",fontSize:12,fontWeight:700}}>📈</button>
+            <button onClick={()=>setView("precall")} style={{background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",borderRadius:8,padding:"6px 9px",cursor:"pointer",fontSize:12,fontWeight:700}}>📞</button>
+            <button onClick={()=>setView("duedate")} style={{background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",borderRadius:8,padding:"6px 9px",cursor:"pointer",fontSize:12,fontWeight:700}}>📆</button>
+            <button onClick={()=>setView("history")} style={{background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",borderRadius:8,padding:"6px 9px",cursor:"pointer",fontSize:12,fontWeight:700}}>📅</button>
+            <button onClick={()=>setView("report")} style={{background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",borderRadius:8,padding:"6px 9px",cursor:"pointer",fontSize:12,fontWeight:700}}>📊</button>
+            <button onClick={()=>setView("datamanager")} style={{background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",borderRadius:8,padding:"6px 9px",cursor:"pointer",fontSize:12,fontWeight:700}}>⚙️</button>
+            <button onClick={()=>setUnlocked(false)} style={{background:"#2b0d0d",border:"1px solid #f8717144",color:"#f87171",borderRadius:8,padding:"6px 9px",cursor:"pointer",fontSize:12,fontWeight:700}}>🔒</button>
+          </div>
+        }/>
+
+      <div style={{padding:"10px 16px 4px"}}>
+        <div style={{color:"#475569",fontSize:11,marginBottom:8}}>{fmtDate(today)}</div>
+        <DailyTargetBar sessions={sessions} dailyIds={dailyIds} date={today}/>
+        {todayIds.length>0&&(
+          <div style={{position:"relative",marginBottom:8}}>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 အမည် / Policy / လိပ်စာ ရှာပါ"
+              style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"10px 14px",color:"#f1f5f9",fontSize:14,outline:"none"}}/>
+            {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#64748b",cursor:"pointer",fontSize:16}}>✕</button>}
+          </div>
+        )}
+      </div>
+
+      <DayView date={today} profiles={profiles} sessions={sessions} dailyIds={dailyIds} onSelect={id=>{setSelId(id);setView("detail");}} search={search}/>
+
+      <button onClick={()=>setShowAdd(true)}
+        style={{position:"fixed",bottom:24,right:20,width:56,height:56,borderRadius:99,background:"#38bdf8",border:"none",color:"#020817",fontSize:26,cursor:"pointer",boxShadow:"0 4px 20px #38bdf866",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,zIndex:50}}>
+        +
+      </button>
+      <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}`}</style>
+    </div>
+  );
+}
+
+// ─── DATA MANAGER ─────────────────────────────────────────────────────────────
+function DataManager({profiles,sessions,dailyIds,onBack,onImport,onClearAll}){
+  const[tab,setTab]=useState("sessions");
+  const[editSess,setEditSess]=useState(null); // {date, custId}
+  const[editSessVal,setEditSessVal]=useState({});
+  const[msg,setMsg]=useState(null);
+
+  const showMsg=t=>{setMsg(t);setTimeout(()=>setMsg(null),2500);};
+
+  // Export all data as JSON file download
+  const exportData=()=>{
+    const data={profiles,sessions,dailyIds,exportedAt:new Date().toISOString()};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;a.download="capital-taiyo-backup-"+getToday()+".json";
+    document.body.appendChild(a);a.click();
+    document.body.removeChild(a);URL.revokeObjectURL(url);
+    showMsg("✓ Backup ဖိုင် Downloads ထဲ သိမ်းပြီး");
+  };
+
+  // Import JSON backup
+  const importData=e=>{
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const d=JSON.parse(ev.target.result);
+        if(!d.profiles||!d.sessions)throw new Error("Invalid");
+        onImport(d);
+        showMsg("✓ Data သွင်းပြီး — app reload လုပ်ပါ");
+      }catch{showMsg("✗ ဖိုင် မမှန်ကန်ပါ");}
+    };
+    reader.readAsText(file);
+  };
+
+  const sortedDates=Object.keys(dailyIds).sort().reverse();
+
+  const startEditSess=(date,custId,s)=>{
+    setEditSess({date,custId});
+    setEditSessVal({collected:s?.collected||0,notes:s?.notes||"",status:s?.status||"pending",amountDue:s?.amountDue||0});
+  };
+
+  const saveEditSess=()=>{
+    if(!editSess)return;
+    const updated={...sessions,[editSess.date]:{...(sessions[editSess.date]||{}),[editSess.custId]:{...editSessVal,collected:parseInt(editSessVal.collected)||0,amountDue:parseInt(editSessVal.amountDue)||0}}};
+    onImport({profiles,sessions:updated,dailyIds});
+    setEditSess(null);
+    showMsg("✓ Data ပြင်ပြီး");
+  };
+
+  const deleteSessionEntry=(date,custId)=>{
+    if(!window.confirm("ဤ record ကို ဖျက်မည်လား?"))return;
+    const newSess={...sessions};
+    if(newSess[date]){const d={...newSess[date]};delete d[custId];newSess[date]=d;}
+    const newDI={...dailyIds,[date]:(dailyIds[date]||[]).filter(i=>i!==custId)};
+    onImport({profiles,sessions:newSess,dailyIds:newDI});
+    showMsg("✓ ဖျက်ပြီး");
+  };
+
+  const TabBtn=({id,label})=>(
+    <button onClick={()=>setTab(id)} style={{flex:1,padding:"10px 0",background:tab===id?"#38bdf8":"transparent",border:"none",borderBottom:tab===id?"none":"1px solid #1e293b",color:tab===id?"#020817":"#64748b",fontWeight:700,cursor:"pointer",fontSize:13}}>
+      {label}
+    </button>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:"#020817"}}>
+      <TopBar title="⚙️ Data Manager" onBack={onBack}/>
+      {msg&&<div style={{background:"#0d2b1e",borderBottom:"1px solid #34d39944",padding:"10px 16px",textAlign:"center",color:"#34d399",fontSize:13,fontWeight:700}}>{msg}</div>}
+
+      {/* Edit Session Modal */}
+      {editSess&&(
+        <div style={{position:"fixed",inset:0,background:"#000c",zIndex:100,display:"flex",alignItems:"flex-end"}}>
+          <div style={{background:"#0f172a",width:"100%",borderRadius:"20px 20px 0 0",padding:20}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <span style={{color:"#f1f5f9",fontWeight:700,fontSize:16}}>✏️ Record ပြင်မည်</span>
+              <button onClick={()=>setEditSess(null)} style={{background:"#1e293b",border:"none",color:"#94a3b8",borderRadius:8,padding:"6px 12px",cursor:"pointer"}}>ပိတ်</button>
+            </div>
+            <div style={{color:"#64748b",fontSize:12,marginBottom:4}}>ရက်: {editSess.date} | Customer: {profiles[editSess.custId]?.name}</div>
+            {[{k:"amountDue",l:"ကောက်ရမည့်ပမာဏ",type:"number"},{k:"collected",l:"ကောက်ရရှိသောငွေ",type:"number"},{k:"notes",l:"မှတ်ချက်",type:"text"}].map(({k,l,type})=>(
+              <div key={k} style={{marginBottom:12}}>
+                <div style={{color:"#64748b",fontSize:12,marginBottom:5}}>{l}</div>
+                <input type={type} value={editSessVal[k]||""} onChange={e=>setEditSessVal(p=>({...p,[k]:e.target.value}))}
+                  style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"11px 14px",color:"#f1f5f9",fontSize:15,outline:"none"}}/>
+              </div>
+            ))}
+            <div style={{marginBottom:14}}>
+              <div style={{color:"#64748b",fontSize:12,marginBottom:6}}>Status</div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {Object.entries(SC).map(([st,cfg])=>(
+                  <button key={st} onClick={()=>setEditSessVal(p=>({...p,status:st}))}
+                    style={{padding:"8px 14px",borderRadius:99,border:`1px solid ${editSessVal.status===st?cfg.color:cfg.color+"44"}`,background:editSessVal.status===st?cfg.bg:"transparent",color:cfg.color,fontWeight:700,cursor:"pointer",fontSize:12}}>
+                    {cfg.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button onClick={saveEditSess} style={{width:"100%",padding:13,background:"#38bdf8",border:"none",borderRadius:12,color:"#020817",fontWeight:800,fontSize:15,cursor:"pointer"}}>
+              သိမ်းဆည်း
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{display:"flex",borderBottom:"1px solid #1e293b"}}>
+        <TabBtn id="sessions" label="📋 Sessions"/>
+        <TabBtn id="backup" label="💾 Backup"/>
+      </div>
+
+      {tab==="sessions"&&(
+        <div style={{padding:"12px 16px 80px"}}>
+          {sortedDates.length===0&&<div style={{textAlign:"center",color:"#475569",padding:40}}>Data မရှိသေး</div>}
+          {sortedDates.map(date=>{
+            const ids=dailyIds[date]||[];
+            const sess=sessions[date]||{};
+            const total=ids.reduce((s,id)=>s+(sess[id]?.collected||0),0);
+            return(
+              <div key={date} style={{marginBottom:16}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <span style={{color:"#38bdf8",fontSize:13,fontWeight:700}}>{fmtDate(date)}</span>
+                  <span style={{color:"#34d399",fontSize:13,fontWeight:700}}>{fmtMMK(total)}</span>
+                </div>
+                {ids.map(id=>{
+                  const p=profiles[id];
+                  const s=sess[id]||{status:"pending"};
+                  const sc=SC[s.status]||SC.pending;
+                  return(
+                    <div key={id} style={{background:"#0f172a",border:`1px solid ${sc.color}33`,borderLeft:`3px solid ${sc.color}`,borderRadius:10,padding:"10px 12px",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{color:"#f1f5f9",fontSize:13,fontWeight:600}}>{p?.name||id}</div>
+                        <div style={{color:"#475569",fontSize:11}}>{p?.policy}</div>
+                        {s.notes&&<div style={{color:"#64748b",fontSize:11}}>📝{s.notes}</div>}
+                        <div style={{display:"flex",gap:8,marginTop:3}}>
+                          <span style={{color:"#fbbf24",fontSize:11}}>ရမည်:{fmtMMK(s.amountDue)}</span>
+                          <span style={{color:"#34d399",fontSize:11}}>ရရှိ:{fmtMMK(s.collected)}</span>
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:6,flexShrink:0}}>
+                        <button onClick={()=>startEditSess(date,id,s)} style={{padding:"7px 10px",background:"#1e293b",border:"1px solid #334155",borderRadius:8,color:"#94a3b8",cursor:"pointer",fontSize:13}}>✏️</button>
+                        <button onClick={()=>deleteSessionEntry(date,id)} style={{padding:"7px 10px",background:"#2b0d0d",border:"1px solid #f8717144",borderRadius:8,color:"#f87171",cursor:"pointer",fontSize:13}}>🗑</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tab==="backup"&&(
+        <div style={{padding:"16px",display:"flex",flexDirection:"column",gap:12}}>
+          <div style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:14,padding:16}}>
+            <div style={{color:"#f1f5f9",fontWeight:700,fontSize:15,marginBottom:4}}>💾 Data Export</div>
+            <div style={{color:"#64748b",fontSize:13,marginBottom:14}}>Data အားလုံးကို JSON ဖိုင်အနေနဲ့ Downloads ထဲ သိမ်းပေးမည်</div>
+            <div style={{display:"flex",gap:10,marginBottom:8,flexWrap:"wrap"}}>
+              <div style={{background:"#1e293b",borderRadius:8,padding:"8px 12px",textAlign:"center",flex:1}}>
+                <div style={{color:"#64748b",fontSize:11}}>Profiles</div>
+                <div style={{color:"#38bdf8",fontWeight:800,fontSize:18}}>{Object.keys(profiles).length}</div>
+              </div>
+              <div style={{background:"#1e293b",borderRadius:8,padding:"8px 12px",textAlign:"center",flex:1}}>
+                <div style={{color:"#64748b",fontSize:11}}>ရက်စုစုပေါင်း</div>
+                <div style={{color:"#38bdf8",fontWeight:800,fontSize:18}}>{Object.keys(dailyIds).length}</div>
+              </div>
+            </div>
+            <button onClick={exportData} style={{width:"100%",padding:13,background:"#38bdf822",border:"1px solid #38bdf866",borderRadius:12,color:"#38bdf8",fontWeight:700,cursor:"pointer",fontSize:15}}>
+              📥 Backup ဖိုင် Download
+            </button>
+          </div>
+          <div style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:14,padding:16}}>
+            <div style={{color:"#f1f5f9",fontWeight:700,fontSize:15,marginBottom:4}}>📤 Data Import</div>
+            <div style={{color:"#64748b",fontSize:13,marginBottom:14}}>Backup ဖိုင် (JSON) ကို ပြန်သွင်းမည်</div>
+            <label style={{display:"block",width:"100%",padding:13,background:"#a78bfa22",border:"1px solid #a78bfa66",borderRadius:12,color:"#a78bfa",fontWeight:700,cursor:"pointer",fontSize:15,textAlign:"center"}}>
+              📂 Backup ဖိုင် ရွေးပါ
+              <input type="file" accept=".json" onChange={importData} style={{display:"none"}}/>
+            </label>
+          </div>
+          <div style={{background:"#2b0d0d",border:"1px solid #f8717144",borderRadius:14,padding:16}}>
+            <div style={{color:"#f87171",fontWeight:700,fontSize:15,marginBottom:4}}>🗑 Data အားလုံးဖျက်</div>
+            <div style={{color:"#64748b",fontSize:13,marginBottom:14}}>Profile နဲ့ မှတ်တမ်း အကုန်ဖျက်မည် — ပြန်မရနိုင်</div>
+            <button onClick={()=>{if(window.confirm("Data အားလုံး ဖျက်မည်လား? ပြန်မရနိုင်ပါ။")){onClearAll();showMsg("✓ Data အားလုံးဖျက်ပြီး");}}}
+              style={{width:"100%",padding:13,background:"#f8717122",border:"1px solid #f8717166",borderRadius:12,color:"#f87171",fontWeight:700,cursor:"pointer",fontSize:15}}>
+              ⚠️ အားလုံးဖျက်မည်
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ─── PIN LOCK ─────────────────────────────────────────────────────────────────
+function PinLock({onUnlock}){
+  const[pin,setPin]=useState("");
+  const[err,setErr]=useState(false);
+  const[setup,setSetup]=useState(!loadLS("ct_pin",null));
+  const[confirm,setConfirm]=useState("");
+  const[step,setStep]=useState(1); // 1=enter new, 2=confirm
+  const stored=loadLS("ct_pin",null);
+
+  const press=d=>{
+    if(setup){
+      if(step===1){
+        const np=pin+d;
+        setPin(np);
+        if(np.length===4){setConfirm(np);setPin("");setStep(2);}
+      } else {
+        const np=pin+d;
+        setPin(np);
+        if(np.length===4){
+          if(np===confirm){saveLS("ct_pin",np);onUnlock();}
+          else{setErr(true);setPin("");setStep(1);setConfirm("");setTimeout(()=>setErr(false),1000);}
+        }
+      }
+    } else {
+      const np=pin+d;
+      setPin(np);
+      if(np.length===4){
+        if(np===stored){onUnlock();}
+        else{setErr(true);setPin("");setTimeout(()=>setErr(false),1000);}
+      }
+    }
+  };
+  const del=()=>setPin(p=>p.slice(0,-1));
+
+  const dots=disp=>[0,1,2,3].map(i=>(
+    <div key={i} style={{width:18,height:18,borderRadius:99,background:disp[i]?"#38bdf8":"transparent",border:"2px solid "+(err?"#f87171":"#334155"),transition:"all .15s"}}/>
+  ));
+
+  return(
+    <div style={{minHeight:"100vh",background:"#020817",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32}}>
+      <div style={{fontSize:40,marginBottom:16}}>🔐</div>
+      <div style={{color:"#f1f5f9",fontWeight:800,fontSize:20,marginBottom:6}}>Capital Taiyo</div>
+      <div style={{color:"#475569",fontSize:14,marginBottom:36,textAlign:"center"}}>
+        {setup?(step===1?"PIN အသစ် သတ်မှတ်ပါ (4 လုံး)":"PIN ထပ်ရိုက်အတည်ပြုပါ"):"PIN ထည့်ပါ"}
+      </div>
+      <div style={{display:"flex",gap:16,marginBottom:40}}>
+        {dots(pin.split("").map(()=>true).concat([false,false,false,false]).slice(0,4))}
+      </div>
+      {err&&<div style={{color:"#f87171",fontSize:13,marginBottom:16,fontWeight:700}}>PIN မမှန်ပါ — ထပ်ကြိုးစားပါ</div>}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,width:"100%",maxWidth:260}}>
+        {[1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((k,i)=>(
+          <button key={i} onClick={()=>{if(k==="⌫")del();else if(k!=="")press(String(k));}}
+            disabled={k===""}
+            style={{height:64,borderRadius:14,background:k==="⌫"?"#2b0d0d":k===""?"transparent":"#1e293b",border:k==="⌫"?"1px solid #f8717144":k===""?"none":"1px solid #334155",color:k==="⌫"?"#f87171":"#f1f5f9",fontSize:k==="⌫"?22:24,fontWeight:700,cursor:k===""?"default":"pointer"}}>
+            {k}
+          </button>
+        ))}
+      </div>
+      {!setup&&(
+        <button onClick={()=>{if(window.confirm("PIN ဖျက်မည်လား? Data မပျောက်ဘူး")){saveLS("ct_pin",null);setSetup(true);setPin("");setStep(1);}}}
+          style={{marginTop:28,background:"none",border:"none",color:"#334155",fontSize:12,cursor:"pointer"}}>
+          PIN မေ့သွားတယ်
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── MONTHLY DASHBOARD ────────────────────────────────────────────────────────
+function MonthlyDashboard({profiles,sessions,dailyIds,onBack}){
+  const allDates=Object.keys(dailyIds).sort().reverse();
+  const months=[...new Set(allDates.map(d=>d.slice(0,7)))];
+  const[selMonth,setSelMonth]=useState(months[0]||getToday().slice(0,7));
+
+  const monthDates=allDates.filter(d=>d.startsWith(selMonth));
+  const stats=useMemo(()=>{
+    let totalC=0,totalD=0,collected=0,absent=0,partial=0,pending=0,customers=new Set();
+    for(const d of monthDates){
+      const ids=dailyIds[d]||[];
+      const sess=sessions[d]||{};
+      for(const id of ids){
+        customers.add(id);
+        const s=sess[id]||{};
+        totalC+=s.collected||0;
+        totalD+=s.amountDue||profiles[id]?.defaultAmountDue||0;
+        if(s.status==="collected")collected++;
+        else if(s.status==="absent")absent++;
+        else if(s.status==="partial")partial++;
+        else pending++;
+      }
+    }
+    return{totalC,totalD,collected,absent,partial,pending,days:monthDates.length,customers:customers.size};
+  },[selMonth,sessions,dailyIds]);
+
+  const rate=stats.totalD>0?Math.round(stats.totalC/stats.totalD*100):0;
+
+  // debt customers - absent or partial across all time
+  const debtors=useMemo(()=>{
+    const debt={};
+    for(const d of Object.keys(sessions)){
+      const sess=sessions[d];
+      for(const [id,s] of Object.entries(sess)){
+        if(s.status==="absent"||(s.status==="partial"&&(s.amountDue||0)>(s.collected||0))){
+          if(!debt[id])debt[id]={count:0,totalOwed:0,lastDate:d};
+          const owed=(s.amountDue||0)-(s.collected||0);
+          debt[id].count++;
+          debt[id].totalOwed+=owed>0?owed:0;
+          if(d>debt[id].lastDate)debt[id].lastDate=d;
+        }
+      }
+    }
+    return Object.entries(debt).map(([id,v])=>({id,profile:profiles[id],...v})).filter(d=>d.profile).sort((a,b)=>b.totalOwed-a.totalOwed);
+  },[sessions,profiles]);
+
+  const fmtMonth=m=>{const[y,mo]=m.split("-");return`${y}ခုနှစ် ${["","ဇန်နဝါရီ","ဖေဖော်ဝါရီ","မတ်","ဧပြီ","မေ","ဇွန်","ဇူလိုင်","သြဂုတ်","စက်တင်ဘာ","အောက်တိုဘာ","နိုဝင်ဘာ","ဒီဇင်ဘာ"][parseInt(mo)]}လ`;};
+
+  return(
+    <div style={{minHeight:"100vh",background:"#020817"}}>
+      <TopBar title="📊 လစဉ် Summary" onBack={onBack}/>
+      <div style={{padding:"12px 16px 80px"}}>
+        {/* Month selector */}
+        <div style={{display:"flex",gap:8,overflowX:"auto",marginBottom:16,paddingBottom:4}}>
+          {months.map(m=>(
+            <button key={m} onClick={()=>setSelMonth(m)}
+              style={{padding:"7px 16px",borderRadius:99,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,whiteSpace:"nowrap",background:selMonth===m?"#38bdf8":"#1e293b",color:selMonth===m?"#020817":"#64748b"}}>
+              {fmtMonth(m)}
+            </button>
+          ))}
+        </div>
+
+        <div style={{color:"#475569",fontSize:13,marginBottom:12,fontWeight:600}}>{fmtMonth(selMonth)}</div>
+
+        {/* Rate bar */}
+        <div style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:14,padding:16,marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+            <span style={{color:"#f1f5f9",fontWeight:700}}>ကောက်ခံနှုန်း</span>
+            <span style={{color:rate>=80?"#34d399":rate>=50?"#fbbf24":"#f87171",fontWeight:800,fontSize:18}}>{rate}%</span>
+          </div>
+          <div style={{background:"#1e293b",borderRadius:99,height:10,overflow:"hidden"}}>
+            <div style={{width:`${rate}%`,height:"100%",background:rate>=80?"#34d399":rate>=50?"#fbbf24":"#f87171",borderRadius:99,transition:"width .5s"}}/>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
+            <span style={{color:"#64748b",fontSize:12}}>ကောက်ရပြီး: {fmtMMK(stats.totalC)}</span>
+            <span style={{color:"#64748b",fontSize:12}}>ရမည်: {fmtMMK(stats.totalD)}</span>
+          </div>
+        </div>
+
+        {/* Stats grid */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+          {[
+            {l:"သွားရောက်ရက်",v:stats.days+"ရက်",c:"#38bdf8"},
+            {l:"Customer (ကြိမ်)",v:stats.customers+"ဦး",c:"#a78bfa"},
+            {l:"ငွေသိမ်းပြီး",v:stats.collected+"ကြိမ်",c:"#34d399"},
+            {l:"မတွေ့",v:stats.absent+"ကြိမ်",c:"#f87171"},
+            {l:"တစ်ပိုင်း",v:stats.partial+"ကြိမ်",c:"#a78bfa"},
+            {l:"ကျန်",v:fmtMMK(stats.totalD-stats.totalC),c:"#fbbf24"},
+          ].map(({l,v,c})=>(
+            <div key={l} style={{background:"#0f172a",border:`1px solid ${c}22`,borderRadius:12,padding:"12px 14px"}}>
+              <div style={{color:"#64748b",fontSize:11,marginBottom:4}}>{l}</div>
+              <div style={{color:c,fontWeight:800,fontSize:15}}>{v}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Daily breakdown */}
+        <div style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:14,padding:16,marginBottom:12}}>
+          <div style={{color:"#64748b",fontSize:11,fontWeight:700,letterSpacing:1,marginBottom:12,textTransform:"uppercase"}}>နေ့တိုင်း မှတ်တမ်း</div>
+          {monthDates.length===0&&<div style={{color:"#475569",textAlign:"center",padding:16}}>မှတ်တမ်းမရှိ</div>}
+          {monthDates.map(d=>{
+            const ids=dailyIds[d]||[];
+            const sess=sessions[d]||{};
+            const dc=ids.reduce((s,id)=>s+(sess[id]?.collected||0),0);
+            const dd=ids.reduce((s,id)=>s+(sess[id]?.amountDue||profiles[id]?.defaultAmountDue||0),0);
+            const dr=dd>0?Math.round(dc/dd*100):0;
+            return(
+              <div key={d} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,paddingBottom:10,borderBottom:"1px solid #1e293b"}}>
+                <div>
+                  <div style={{color:"#f1f5f9",fontSize:13,fontWeight:600}}>{new Date(d+"T00:00:00").toLocaleDateString("my-MM",{month:"short",day:"numeric",weekday:"short"})}</div>
+                  <div style={{color:"#475569",fontSize:11}}>{ids.length}ဦး</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{color:"#34d399",fontWeight:700,fontSize:13}}>{fmtMMK(dc)}</div>
+                  <div style={{color:dr>=80?"#34d399":dr>=50?"#fbbf24":"#f87171",fontSize:11}}>{dr}%</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Debt customers */}
+        {debtors.length>0&&(
+          <div style={{background:"#0f172a",border:"1px solid #f8717133",borderRadius:14,padding:16}}>
+            <div style={{color:"#f87171",fontSize:12,fontWeight:700,letterSpacing:1,marginBottom:12,textTransform:"uppercase"}}>⚠️ အကြွေးကျန် Customer ({debtors.length}ဦး)</div>
+            {debtors.slice(0,10).map(d=>(
+              <div key={d.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,paddingBottom:10,borderBottom:"1px solid #1e293b"}}>
+                <div style={{flex:1}}>
+                  <div style={{color:"#f1f5f9",fontSize:13,fontWeight:600,marginBottom:2}}>{d.profile.name}</div>
+                  <div style={{color:"#475569",fontSize:11}}>{d.profile.policy}</div>
+                  <div style={{color:"#64748b",fontSize:11}}>မတွေ့/မပြည့်: {d.count}ကြိမ် | နောက်ဆုံး: {fmtDate(d.lastDate)}</div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{color:"#f87171",fontWeight:800,fontSize:13}}>{fmtMMK(d.totalOwed)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── RECEIPT ──────────────────────────────────────────────────────────────────
+function Receipt({custId,date,profiles,sessions,onClose}){
+  const p=profiles[custId];
+  const s=(sessions[date]||{})[custId]||{};
+  const[shared,setShared]=useState(false);
+  const now=new Date();
+  const timeStr=now.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit",hour12:true});
+  const dateStr=fmtDate(date);
+
+  const receiptText=
+`╔══════════════════════════════╗
+       Capital Taiyo Insurance
+        ငွေလက်ခံဖြတ်ပိုင်း
+╠══════════════════════════════╣
+ ရက်စွဲ  : ${dateStr}
+ အချိန်  : ${timeStr}
+══════════════════════════════
+ Policy  : ${p?.policy||"—"}
+ အမည်   : ${p?.name||"—"}
+ လိပ်စာ  : ${p?.address||"—"}
+══════════════════════════════
+ ကောက်ရမည် : ${fmtMMK(s.amountDue||0)}
+ ပေးသွင်းငွေ : ${fmtMMK(s.collected||0)}
+${(s.amountDue||0)>(s.collected||0)?` ကျန်ငွေ    : ${fmtMMK((s.amountDue||0)-(s.collected||0))}`:" ✓ ပြည့်ပြည့်ဝဝ ပေးပြီး"}
+══════════════════════════════
+ Status : ${SC[s.status]?.label||"—"}
+${s.notes?` မှတ်ချက် : ${s.notes}`:""}
+╚══════════════════════════════╝
+  ကျေးဇူးတင်ပါသည် 🙏
+  Capital Taiyo Insurance`;
+
+  const share=async()=>{
+    if(navigator.share){
+      try{await navigator.share({title:"Receipt - "+p?.name,text:receiptText});setShared(true);setTimeout(()=>setShared(false),2000);}
+      catch{}
+    } else {
+      navigator.clipboard?.writeText(receiptText);
+      setShared(true);setTimeout(()=>setShared(false),2000);
+    }
+  };
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"#000c",zIndex:150,display:"flex",alignItems:"flex-end"}}>
+      <div style={{background:"#0f172a",width:"100%",borderRadius:"20px 20px 0 0",padding:20,maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <span style={{color:"#f1f5f9",fontWeight:700,fontSize:17}}>🧾 ငွေလက်ခံဖြတ်ပိုင်း</span>
+          <button onClick={onClose} style={{background:"#1e293b",border:"none",color:"#94a3b8",borderRadius:8,padding:"6px 12px",cursor:"pointer"}}>ပိတ်</button>
+        </div>
+        {/* Receipt card */}
+        <div style={{background:"#020817",border:"1px solid #334155",borderRadius:14,padding:20,fontFamily:"monospace",marginBottom:16}}>
+          <div style={{textAlign:"center",marginBottom:16}}>
+            <div style={{color:"#38bdf8",fontWeight:800,fontSize:15}}>Capital Taiyo Insurance</div>
+            <div style={{color:"#64748b",fontSize:12}}>ငွေလက်ခံဖြတ်ပိုင်း</div>
+          </div>
+          <div style={{borderTop:"1px dashed #334155",borderBottom:"1px dashed #334155",padding:"12px 0",marginBottom:12}}>
+            {[{l:"ရက်စွဲ",v:dateStr},{l:"အချိန်",v:timeStr},{l:"Policy",v:p?.policy||"—"},{l:"အမည်",v:p?.name||"—"}].map(({l,v})=>(
+              <div key={l} style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                <span style={{color:"#64748b",fontSize:12}}>{l}</span>
+                <span style={{color:"#f1f5f9",fontSize:12,fontWeight:600,textAlign:"right",maxWidth:"60%"}}>{v}</span>
+              </div>
+            ))}
+            {p?.address&&<div style={{color:"#475569",fontSize:11,marginTop:4}}>{p.address}</div>}
+          </div>
+          <div style={{marginBottom:12}}>
+            {[{l:"ကောက်ရမည်",v:fmtMMK(s.amountDue||0),c:"#64748b"},{l:"ပေးသွင်းငွေ",v:fmtMMK(s.collected||0),c:"#34d399"}].map(({l,v,c})=>(
+              <div key={l} style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                <span style={{color:"#64748b",fontSize:13}}>{l}</span>
+                <span style={{color:c,fontSize:15,fontWeight:800}}>{v}</span>
+              </div>
+            ))}
+            {(s.amountDue||0)>(s.collected||0)?(
+              <div style={{display:"flex",justifyContent:"space-between"}}>
+                <span style={{color:"#f87171",fontSize:13}}>ကျန်ငွေ</span>
+                <span style={{color:"#f87171",fontSize:15,fontWeight:800}}>{fmtMMK((s.amountDue||0)-(s.collected||0))}</span>
+              </div>
+            ):(
+              <div style={{textAlign:"center",color:"#34d399",fontSize:13,fontWeight:700,marginTop:4}}>✓ ပြည့်ပြည့်ဝဝ ပေးပြီး</div>
+            )}
+          </div>
+          {s.notes&&<div style={{background:"#1e293b",borderRadius:8,padding:"8px 12px",color:"#94a3b8",fontSize:12,marginBottom:8}}>မှတ်ချက်: {s.notes}</div>}
+          <div style={{borderTop:"1px dashed #334155",paddingTop:12,textAlign:"center"}}>
+            <Badge status={s.status||"pending"}/>
+            <div style={{color:"#475569",fontSize:11,marginTop:8}}>ကျေးဇူးတင်ပါသည် 🙏</div>
+          </div>
+        </div>
+        <button onClick={share} style={{width:"100%",padding:14,background:shared?"#0d2b1e":"#38bdf822",border:`1px solid ${shared?"#34d399":"#38bdf866"}`,borderRadius:12,color:shared?"#34d399":"#38bdf8",fontWeight:700,cursor:"pointer",fontSize:15}}>
+          {shared?"✓ ပြီးပြီ!":(navigator.share?"📤 Share / Send":"📋 Copy ကူး")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+// ─── GOOGLE MAPS HELPER ───────────────────────────────────────────────────────
+// Opens Google Maps navigation from address string
+function openMaps(address){
+  const q=encodeURIComponent(address+", Myanmar");
+  window.open("https://www.google.com/maps/dir/?api=1&destination="+q,"_blank");
+}
+
+// ─── DAILY TARGET WIDGET ─────────────────────────────────────────────────────
+function DailyTargetBar({sessions,dailyIds,date}){
+  const[target,setTarget]=useState(()=>loadLS("ct_target_"+date,0));
+  const[editing,setEditing]=useState(false);
+  const[inp,setInp]=useState("");
+  const ids=dailyIds[date]||[];
+  const sess=sessions[date]||{};
+  const collected=ids.reduce((s,id)=>s+(sess[id]?.collected||0),0);
+  const rate=target>0?Math.min(100,Math.round(collected/target*100)):0;
+  const save=()=>{const v=parseInt(inp)||0;saveLS("ct_target_"+date,v);setTarget(v);setEditing(false);};
+
+  if(!target&&!editing)return(
+    <button onClick={()=>setEditing(true)} style={{width:"100%",padding:"9px 14px",background:"#1e293b",border:"1px dashed #334155",borderRadius:10,color:"#475569",fontWeight:700,cursor:"pointer",fontSize:13,marginBottom:8,textAlign:"left"}}>
+      🎯 ဒီနေ့ target သတ်မှတ်ရန်
+    </button>
+  );
+  if(editing)return(
+    <div style={{display:"flex",gap:8,marginBottom:8}}>
+      <input type="number" value={inp} onChange={e=>setInp(e.target.value)} placeholder="Target ပမာဏ (Ks)"
+        style={{flex:1,background:"#1e293b",border:"1px solid #38bdf8",borderRadius:10,padding:"9px 14px",color:"#f1f5f9",fontSize:14,outline:"none"}}
+        onKeyDown={e=>e.key==="Enter"&&save()} autoFocus/>
+      <button onClick={save} style={{padding:"9px 16px",background:"#38bdf8",border:"none",borderRadius:10,color:"#020817",fontWeight:700,cursor:"pointer"}}>✓</button>
+      <button onClick={()=>setEditing(false)} style={{padding:"9px 12px",background:"#1e293b",border:"1px solid #334155",borderRadius:10,color:"#94a3b8",cursor:"pointer"}}>✕</button>
+    </div>
+  );
+  return(
+    <div style={{background:"#0f172a",border:`1px solid ${rate>=100?"#34d399":rate>=50?"#fbbf24":"#38bdf8"}33`,borderRadius:10,padding:"10px 14px",marginBottom:8}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+        <span style={{color:"#f1f5f9",fontSize:13,fontWeight:700}}>🎯 Target: {fmtMMK(target)}</span>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{color:rate>=100?"#34d399":rate>=50?"#fbbf24":"#38bdf8",fontWeight:800,fontSize:15}}>{rate}%</span>
+          <button onClick={()=>{setInp(String(target));setEditing(true);}} style={{background:"none",border:"none",color:"#475569",cursor:"pointer",fontSize:12}}>✏️</button>
+        </div>
+      </div>
+      <div style={{background:"#1e293b",borderRadius:99,height:8,overflow:"hidden"}}>
+        <div style={{width:`${rate}%`,height:"100%",background:rate>=100?"#34d399":rate>=50?"#fbbf24":"#38bdf8",borderRadius:99,transition:"width .4s"}}/>
+      </div>
+      <div style={{color:"#64748b",fontSize:11,marginTop:4}}>{fmtMMK(collected)} / {fmtMMK(target)} {rate>=100?"✓ Target ရောက်ပြီ!":""}</div>
+    </div>
+  );
+}
+
+// ─── PRE-CALL TRACKER ─────────────────────────────────────────────────────────
+function PreCallTracker({profiles,sessions,dailyIds,date,onBack}){
+  // Tomorrow's date
+  const tomorrow=(()=>{const d=new Date(date+"T00:00:00");d.setDate(d.getDate()+1);return d.toISOString().slice(0,10);})();
+  const[calls,setCalls]=useState(()=>loadLS("ct_precalls_"+tomorrow,{}));
+  const[search,setSearch]=useState("");
+  const saveCalls=v=>{setCalls(v);saveLS("ct_precalls_"+tomorrow,v);};
+
+  // Suggest: carried-over from today (absent/partial)
+  const todaySess=sessions[date]||{};
+  const todayIds=dailyIds[date]||[];
+  const suggested=todayIds.filter(id=>{
+    const s=todaySess[id];
+    return s&&(s.status==="absent"||s.status==="partial");
+  });
+
+  const allProfiles=Object.values(profiles).filter(p=>{
+    if(!search)return true;
+    const q=search.toLowerCase();
+    return p.name?.toLowerCase().includes(q)||p.policy?.toLowerCase().includes(q);
+  });
+
+  const STATUS={
+    none:{label:"မခေါ်ရသေး",color:"#475569",bg:"#1e293b"},
+    yes:{label:"လာပါမည်",color:"#34d399",bg:"#0d2b1e"},
+    no:{label:"မရဘူး",color:"#f87171",bg:"#2b0d0d"},
+    later:{label:"နောက်ကျမယ်",color:"#fbbf24",bg:"#292110"},
+    noans:{label:"မကိုင်",color:"#a78bfa",bg:"#1a1030"},
+  };
+
+  const setStatus=(id,status)=>{
+    const note=calls[id]?.note||"";
+    saveCalls({...calls,[id]:{status,note,calledAt:new Date().toISOString()}});
+  };
+  const setNote=(id,note)=>saveCalls({...calls,[id]:{...calls[id],note}});
+
+  const counts=Object.values(calls).reduce((s,c)=>{s[c.status]=(s[c.status]||0)+1;return s;},{});
+  const tomorrowFmt=new Date(tomorrow+"T00:00:00").toLocaleDateString("my-MM",{month:"short",day:"numeric",weekday:"short"});
+
+  return(
+    <div style={{minHeight:"100vh",background:"#020817"}}>
+      <TopBar title={"📞 ကြိုတင်ခေါ်ဆိုမှတ်တမ်း"} onBack={onBack}/>
+      <div style={{padding:"12px 16px 80px"}}>
+        <div style={{color:"#38bdf8",fontSize:13,fontWeight:700,marginBottom:10}}>မနက်ဖြန် ({tomorrowFmt}) သွားမည့် customer တွေကို ကြိုဆက်ပါ</div>
+
+        {/* Summary */}
+        <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+          {Object.entries(STATUS).map(([k,v])=>(
+            <div key={k} style={{background:v.bg,border:`1px solid ${v.color}44`,borderRadius:8,padding:"5px 10px",textAlign:"center"}}>
+              <div style={{color:v.color,fontWeight:800,fontSize:13}}>{counts[k]||0}</div>
+              <div style={{color:v.color,fontSize:10}}>{v.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Suggested (from today's carry-overs) */}
+        {suggested.length>0&&(
+          <div style={{background:"#292110",border:"1px solid #fbbf2433",borderRadius:10,padding:"10px 14px",marginBottom:14}}>
+            <div style={{color:"#fbbf24",fontSize:12,fontWeight:700,marginBottom:4}}>⚠ ဒီနေ့ကျန် customer ({suggested.length}ဦး) — ဦးစားပေး ခေါ်ပါ</div>
+            {suggested.map(id=><span key={id} style={{color:"#94a3b8",fontSize:12,marginRight:8}}>{profiles[id]?.name}</span>)}
+          </div>
+        )}
+
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Customer ရှာပါ"
+          style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:10,padding:"10px 14px",color:"#f1f5f9",fontSize:14,outline:"none",marginBottom:12}}/>
+
+        {allProfiles.map(p=>{
+          const c=calls[p.id]||{status:"none"};
+          const sc=STATUS[c.status]||STATUS.none;
+          return(
+            <div key={p.id} style={{background:"#0f172a",border:`1px solid ${sc.color}33`,borderLeft:`3px solid ${sc.color}`,borderRadius:12,padding:"12px 14px",marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8,gap:8}}>
+                <div style={{flex:1}}>
+                  <div style={{color:"#f1f5f9",fontWeight:700,fontSize:14}}>{p.name}</div>
+                  <div style={{color:"#475569",fontSize:11}}>{p.policy}{p.address?` • ${p.address}`:""}</div>
+                </div>
+                {p.phone&&(
+                  <a href={"tel:"+p.phone.replace(/[^0-9+]/g,"")}
+                    style={{padding:"7px 12px",background:"#0d2035",border:"1px solid #38bdf844",borderRadius:8,color:"#38bdf8",fontWeight:700,fontSize:12,whiteSpace:"nowrap"}}>
+                    📞 ခေါ်
+                  </a>
+                )}
+              </div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:c.status!=="none"?8:0}}>
+                {Object.entries(STATUS).filter(([k])=>k!=="none").map(([k,v])=>(
+                  <button key={k} onClick={()=>setStatus(p.id,k)}
+                    style={{padding:"5px 10px",borderRadius:99,border:`1px solid ${c.status===k?v.color:v.color+"44"}`,background:c.status===k?v.bg:"transparent",color:v.color,fontWeight:700,cursor:"pointer",fontSize:11}}>
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+              {c.status!=="none"&&(
+                <input value={c.note||""} onChange={e=>setNote(p.id,e.target.value)} placeholder="မှတ်ချက် (ဥပမာ - ၉နာရီနောက်မှလာဆို)"
+                  style={{width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:8,padding:"8px 12px",color:"#f1f5f9",fontSize:12,outline:"none"}}/>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── DUE DATE TRACKER ─────────────────────────────────────────────────────────
+function DueDateTracker({profiles,onBack,onUpdateProfile}){
+  const[editId,setEditId]=useState(null);
+  const[dateInp,setDateInp]=useState("");
+  const today=getToday();
+
+  const withDue=Object.values(profiles).filter(p=>p.dueDate).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const noDue=Object.values(profiles).filter(p=>!p.dueDate);
+
+  const daysLeft=d=>{
+    const diff=Math.round((new Date(d+"T00:00:00")-new Date(today+"T00:00:00"))/(1000*60*60*24));
+    return diff;
+  };
+  const urgency=d=>{
+    const dl=daysLeft(d);
+    if(dl<0)return{color:"#f87171",label:"သက်တမ်းကုန်",bg:"#2b0d0d"};
+    if(dl<=7)return{color:"#f87171",label:`${dl}ရက်သာကျန်`,bg:"#2b0d0d"};
+    if(dl<=30)return{color:"#fbbf24",label:`${dl}ရက်ကျန်`,bg:"#292110"};
+    return{color:"#34d399",label:`${dl}ရက်ကျန်`,bg:"#0d2b1e"};
+  };
+
+  const saveDate=id=>{
+    onUpdateProfile({...profiles[id],dueDate:dateInp});
+    setEditId(null);
+  };
+
+  const overdue=withDue.filter(p=>daysLeft(p.dueDate)<0).length;
+  const soon=withDue.filter(p=>{const d=daysLeft(p.dueDate);return d>=0&&d<=30;}).length;
+
+  return(
+    <div style={{minHeight:"100vh",background:"#020817"}}>
+      <TopBar title="📆 Due Date Tracker" onBack={onBack}/>
+      <div style={{padding:"12px 16px 80px"}}>
+
+        {/* Summary badges */}
+        <div style={{display:"flex",gap:8,marginBottom:14}}>
+          {overdue>0&&<div style={{background:"#2b0d0d",border:"1px solid #f8717144",borderRadius:8,padding:"6px 12px"}}><span style={{color:"#f87171",fontWeight:700,fontSize:13}}>⚠ {overdue}ဦး သက်တမ်းကုန်</span></div>}
+          {soon>0&&<div style={{background:"#292110",border:"1px solid #fbbf2444",borderRadius:8,padding:"6px 12px"}}><span style={{color:"#fbbf24",fontWeight:700,fontSize:13}}>⏰ {soon}ဦး ၃၀ရက်အတွင်း</span></div>}
+        </div>
+
+        {/* Due date set */}
+        {withDue.map(p=>{
+          const u=urgency(p.dueDate);
+          return(
+            <div key={p.id} style={{background:"#0f172a",border:`1px solid ${u.color}33`,borderLeft:`3px solid ${u.color}`,borderRadius:12,padding:"12px 14px",marginBottom:8}}>
+              {editId===p.id?(
+                <div>
+                  <div style={{color:"#f1f5f9",fontWeight:700,fontSize:14,marginBottom:8}}>{p.name}</div>
+                  <div style={{display:"flex",gap:8}}>
+                    <input type="date" value={dateInp} onChange={e=>setDateInp(e.target.value)}
+                      style={{flex:1,background:"#1e293b",border:"1px solid #38bdf8",borderRadius:10,padding:"9px 12px",color:"#f1f5f9",fontSize:14,outline:"none"}}/>
+                    <button onClick={()=>saveDate(p.id)} style={{padding:"9px 14px",background:"#34d399",border:"none",borderRadius:10,color:"#020817",fontWeight:700,cursor:"pointer"}}>✓</button>
+                    <button onClick={()=>setEditId(null)} style={{padding:"9px 10px",background:"#1e293b",border:"1px solid #334155",borderRadius:10,color:"#94a3b8",cursor:"pointer"}}>✕</button>
+                  </div>
+                </div>
+              ):(
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                  <div style={{flex:1}}>
+                    <div style={{color:"#f1f5f9",fontWeight:700,fontSize:14,marginBottom:2}}>{p.name}</div>
+                    <div style={{color:"#475569",fontSize:11}}>{p.policy}</div>
+                    <div style={{color:"#64748b",fontSize:11,marginTop:2}}>Due: {new Date(p.dueDate+"T00:00:00").toLocaleDateString("my-MM",{year:"numeric",month:"short",day:"numeric"})}</div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <div style={{background:u.bg,border:`1px solid ${u.color}44`,borderRadius:8,padding:"4px 10px",marginBottom:4}}>
+                      <span style={{color:u.color,fontWeight:700,fontSize:12}}>{u.label}</span>
+                    </div>
+                    <button onClick={()=>{setEditId(p.id);setDateInp(p.dueDate);}} style={{background:"none",border:"none",color:"#475569",cursor:"pointer",fontSize:13}}>✏️ ပြင်</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* No due date set */}
+        {noDue.length>0&&(
+          <div style={{marginTop:16}}>
+            <div style={{color:"#475569",fontSize:12,fontWeight:700,marginBottom:10}}>Due date မသတ်မှတ်ရသေး ({noDue.length}ဦး)</div>
+            {noDue.map(p=>(
+              <div key={p.id} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:12,padding:"12px 14px",marginBottom:8}}>
+                {editId===p.id?(
+                  <div>
+                    <div style={{color:"#f1f5f9",fontWeight:700,fontSize:14,marginBottom:8}}>{p.name}</div>
+                    <div style={{display:"flex",gap:8}}>
+                      <input type="date" value={dateInp} onChange={e=>setDateInp(e.target.value)}
+                        style={{flex:1,background:"#1e293b",border:"1px solid #38bdf8",borderRadius:10,padding:"9px 12px",color:"#f1f5f9",fontSize:14,outline:"none"}}/>
+                      <button onClick={()=>saveDate(p.id)} style={{padding:"9px 14px",background:"#34d399",border:"none",borderRadius:10,color:"#020817",fontWeight:700,cursor:"pointer"}}>✓</button>
+                      <button onClick={()=>setEditId(null)} style={{padding:"9px 10px",background:"#1e293b",border:"1px solid #334155",borderRadius:10,color:"#94a3b8",cursor:"pointer"}}>✕</button>
+                    </div>
+                  </div>
+                ):(
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div>
+                      <div style={{color:"#f1f5f9",fontWeight:700,fontSize:14,marginBottom:2}}>{p.name}</div>
+                      <div style={{color:"#475569",fontSize:11}}>{p.policy}</div>
+                    </div>
+                    <button onClick={()=>{setEditId(p.id);setDateInp("");}}
+                      style={{padding:"7px 14px",background:"#1e293b",border:"1px solid #334155",borderRadius:8,color:"#64748b",cursor:"pointer",fontSize:12,fontWeight:700}}>
+                      + Due date
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
